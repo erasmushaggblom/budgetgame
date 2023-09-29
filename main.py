@@ -1,8 +1,156 @@
 import pygame
 import random
 import asyncio
-from urllib import request, parse
+import urllib
+import sys
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen, Request
 import json
+import uuid
+import js
+
+class RequestHandler:
+    """
+    WASM compatible request handler
+    auto-detects emscripten environment and sends requests using JavaScript Fetch API
+    """
+
+    GET = "GET"
+    POST = "POST"
+    _js_code = ""
+    _init = False
+
+    def __init__(self):
+        self.is_emscripten = sys.platform == "emscripten"
+        if not self._init:
+            self.init()
+        self.debug = True
+        self.result = None
+        if not self.is_emscripten:
+            try:
+                import requests
+
+                self.requests = requests
+            except ImportError:
+                pass
+
+    def init(self):
+        if self.is_emscripten:
+            self._js_code = """
+window.Fetch = {}
+// generator functions for async fetch API
+// script is meant to be run at runtime in an emscripten environment
+// Fetch API allows data to be posted along with a POST request
+window.Fetch.POST = function * POST (url, data)
+{
+    // post info about the request
+    console.log('POST: ' + url + 'Data: ' + data);
+    var request = new Request(url, {headers: {'Accept': 'application/json','Content-Type': 'application/json'},
+        method: 'POST',
+        body: data});
+    var content = 'undefined';
+    fetch(request)
+   .then(resp => resp.text())
+   .then((resp) => {
+        console.log(resp);
+        content = resp;
+   })
+   .catch(err => {
+         // handle errors
+         console.log("An Error Occurred:")
+         console.log(err);
+    });
+    while(content == 'undefined'){
+        yield;
+    }
+    yield content;
+}
+// Only URL to be passed
+// when called from python code, use urllib.parse.urlencode to get the query string
+window.Fetch.GET = function * GET (url)
+{
+    console.log('GET: ' + url);
+    var request = new Request(url, { method: 'GET' })
+    var content = 'undefined';
+    fetch(request)
+   .then(resp => resp.text())
+   .then((resp) => {
+        console.log(resp);
+        content = resp;
+   })
+   .catch(err => {
+         // handle errors
+         console.log("An Error Occurred:");
+         console.log(err);
+    });
+    while(content == 'undefined'){
+        // generator
+        yield;
+    }
+
+    yield content;
+}
+            """
+            try:
+                platform.window.eval(self._js_code)
+            except AttributeError:
+                self.is_emscripten = False
+
+    @staticmethod
+    def read_file(file):
+        # synchronous reading of file intended for evaluating on initialization
+        # use async functions during runtime
+        with open(file, "r") as f:
+            data = f.read()
+        return data
+
+    @staticmethod
+    def print(*args, default=True):
+        try:
+            for i in args:
+                platform.window.console.log(i)
+        except AttributeError:
+            pass
+        except Exception as e:
+            return e
+        if default:
+            print(*args)
+
+    async def get(self, url, params=None, doseq=False):
+        # await asyncio.sleep(5)
+        if params is None:
+            params = {}
+        if self.is_emscripten:
+            query_string = urlencode(params, doseq=doseq)
+            await asyncio.sleep(0)
+            content = await platform.jsiter(platform.window.Fetch.GET(url + "?" + query_string))
+            if self.debug:
+                self.print(content)
+            self.result = content
+        else:
+            self.result = self.requests.get(url, params).text
+        return self.result
+
+    # def get(self, url, params=None, doseq=False):
+    #     return await self._get(url, params, doseq)
+
+    async def post(self, url, data=None):
+        if data is None:
+            data = {}
+        if self.is_emscripten:
+            await asyncio.sleep(0)
+            content = await platform.jsiter(platform.window.Fetch.POST(url, json.dumps(data)))
+            if self.debug:
+                self.print(content)
+            self.result = content
+        else:
+            self.result = self.requests.post(
+                url, data, headers={"Accept": "application/json", "Content-Type": "application/json"}
+            ).text
+        return self.result
+
+    # def post(self, url, data=None):
+    #     return await self._post(url, data)
 
 class BudgetGame(): #create class for the game; class includes internal variables that are tracked throughout the game
     def __init__(self):
@@ -63,7 +211,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.main_menu_action = False #checks if main menu button has been clicked
         self.scripts = {} #dictionary containing the scripts chosen in a given round
         self.agency_status = {} #dictionary checking for input-based events
-        self.roundstandard = 10 #how many rounds are played
+        self.roundstandard = 2 #how many rounds are played
         self.round_number = 1 #tracks the number of rounds
         self.roundclicked = 2 #tracks the number of times the player has chosen to advance the round
         self.script_events = [0, 0] #list of events that have occurred in the current round
@@ -130,6 +278,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.historical_rankings = []
         self.ranking_schools = ["School 1", "School 2", "School 3", "School 4", "School 5", "School 6", "School 7", "School 8", "School 9", "School 10", "School 11", "School 12", "School 13", "School 14", "School 15", "School 16", "School 17", "School 18", "School 19", "School 20"]
         self.possible_events = ["Talent show", "Sports fair", "Science fair", "Basketball game", "Football game", "Cook-off", "Bake sale", "Quiz", "School exchange", "Writing workshop", "Dance performance", "Musical performance", "Holiday celebration", "Independence party", "Museum visit", "Treasure hunt", "Charity run", "School party"] #names for possible events
+
 
     def baseconditions(self):
         if self.first_time == True:
@@ -409,10 +558,13 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.summary_click_forward(3, rect1)
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
+    def finish_game(self):
+        self.add_final_output()
+        self.rename_output()
+        game.post_output()
+        raise SystemExit
 
     def execute_script(self, script, agency): #executes a given script
         effects = []
@@ -658,27 +810,26 @@ class BudgetGame(): #create class for the game; class includes internal variable
             my_file.write(f"total number of clicks: {self.click_counter}")
             my_file.write("\n")
 
+    def create_identifier(self):
+        random_uuid = uuid.uuid1()
+        self.id = str(random_uuid)
+
+
     def post_output(self):
-        #POST data string to `url`, return page and headers
-
-        headers={'Content-Type':'application/json'}
-
-        url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
-
-        data = ""
+        string1 = ""
+        identity = self.id
 
         with open("output_file.txt", "r") as my_file:
             for i in my_file:
-                data += i
-        # if data is not in bytes, convert to it to utf-8 bytes
-        bindata = data if type(data) == bytes else data.encode('utf-8')
+                string1 += i
+        post_dict = {identity: string1}       
+        output = RequestHandler()
+        # Define the URL and data for the POST request
+        url = "https://httpbin.org/post"
+        data = post_dict
+        # Send the POST request
+        asyncio.run(output.post(url, data))
 
-        # need Request to pass headers
-        req = request.Request(url, bindata, headers)
-        resp = request.urlopen(req)
-
-
-        return resp.read(), resp.getheaders()
 
     def add_to_output(self, add: str): #records player inputs in the output file
         lines = 0
@@ -694,6 +845,9 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 my_file.write(f"total budget: {str(self.total_budget)}")
                 my_file.write(add)
                 my_file.write("\n")
+
+
+
 
     def add_agency(self, agency: str, initial_budget: float, initial_staff: int, initial_equipment: float, initial_events, staff_status, equipment_status, event_status, budget_status): #add different agencies for budgeting; the game currently allows for up to 7 options at a time for graphical reasons. the input includes an initial budget
         self.agencies.append((agency, initial_budget))
@@ -1161,10 +1315,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.instruction_2 = True
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
     def instruction_screen_2(self):
         self.window.fill(self.white)
@@ -1233,10 +1385,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.baseconditions()
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def show_postgame(self): #draws a post-game screen
         x = 200
@@ -1259,15 +1409,11 @@ class BudgetGame(): #create class for the game; class includes internal variable
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    self.add_final_output()
-                    self.rename_output()
-                    self.post_output()
-                    raise SystemExit
+                    self.finish_game()
+
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
 
     def draw_summary_prompts(self, condition): #draws a prompt to select a given agency
@@ -1401,10 +1547,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                             self.main_menu_action = False
                             self.agency = "null"
                     if event.type == pygame.QUIT:
-                        self.add_final_output()
-                        self.rename_output()
-                        self.post_output()
-                        raise SystemExit
+                        self.finish_game()
+
                 pygame.display.update()
         if condition == "summary":
             while True:
@@ -1431,10 +1575,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                             self.main_menu_action = False
                             self.agency = "null"
                     if event.type == pygame.QUIT:
-                        self.add_final_output()
-                        self.rename_output()
-                        self.post_output()
-                        raise SystemExit
+                            self.finish_game()
+
                 pygame.display.update()
             text1 = self.arial.render(f"This is a summary of game events for {agency}", True, self.black)
 
@@ -1588,10 +1730,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                             self.choice = "null"
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def menu_option_2(self, menu_options): #prompts the player to select a budget action for which they will be given more information
         self.agency = "Leaf High"
@@ -1629,10 +1769,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.information = False
                         self.show_effects = True
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def menu_option_3(self, menu_options): #prompts the player to choose an agency for which they will receive a summary of game events
         self.window.fill(self.white)
@@ -1682,10 +1820,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
     def draw_exit(self, condition):
         x = 340
@@ -1852,10 +1988,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def show_agency_summary_2(self, roundnumber):
         if self.click_summary == True:
@@ -1945,10 +2079,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.summary_click_forward(2, rect1)
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
 
     def summary_out(self):
@@ -2040,10 +2172,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
@@ -2184,10 +2314,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
         for event in pygame.event.get(): #checks game events; at the moment only click-based events are taken into consideration
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     xy = pygame.mouse.get_pos()
@@ -2218,6 +2346,9 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.baseconditions()
             if self.round_number == self.roundstandard + 1:
                 self.postgame = True
+                self.add_final_output()
+                self.rename_output()
+                self.post_output()
                 self.start = False #condition for showing the instruction screen first
                 self.instruction_2 = False
                 self.information = False
@@ -2264,10 +2395,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def historical_performance(self, agency):
         self.window.fill(self.white)
@@ -2282,10 +2411,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.baseconditions()
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def menu_option_6(self, menu_options): #show performance ranking
         self.window.fill(self.white)
@@ -2327,10 +2454,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def show_performance_rankings(self):
         ranking = self.historical_rankings[self.roundchoice-1]
@@ -2383,10 +2508,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
         for event in pygame.event.get(): #checks game events; at the moment only click-based events are taken into consideration
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.increase_click_counter()
@@ -2426,10 +2549,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.add_to_output("menu option 7 back button clicked")
                 self.main_menu_action = False
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
 
     def menu_option_8(self): #optional function for another menu item (currently removed)
         self.window.fill(self.white)
@@ -2461,10 +2582,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.add_to_output("menu option 8 back button clicked")
                 self.main_menu_action = False
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
     def menu_option_9(self): #optional function for another menu item (currently removed)
         self.window.fill(self.white)
@@ -2496,10 +2615,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.add_to_output("menu option 8 back button clicked")
                 self.main_menu_action = False
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
     def menu_option_10(self): #optional function for another menu item (currently removed)
         self.window.fill(self.white)
@@ -2531,10 +2648,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     self.add_to_output("menu option 8 back button clicked")
                 self.main_menu_action = False
             if event.type == pygame.QUIT:
-                self.add_final_output()
-                self.rename_output()
-                self.post_output()
-                raise SystemExit
+                self.finish_game()
+
             
 
 
@@ -3366,6 +3481,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 game = BudgetGame()
 game.check_participant_number()
+game.create_identifier()
 game.create_agencies()
 game.create_game_board()
 game.create_budget_options()
@@ -3377,6 +3493,7 @@ game.create_scripts()
 game.create_agency_stats()
 game.check_score()
 game.create_ranking()
+game.post_output()
 game.historical_rankings.append(game.schoolranking)
 pygame.font.get_fonts()
 game.menu_options = game.create_game_menu() #creates the agency selection menu
@@ -3580,10 +3697,8 @@ async def main():
                             game.rankings = True
 
             if event.type == pygame.QUIT:
-                game.add_final_output()
-                game.rename_output()
-                game.post_output()
-                raise SystemExit
+                game.finish_game()
+
 
         game.budget_menu = []
         try:

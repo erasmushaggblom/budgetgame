@@ -9,7 +9,7 @@ import json
 import uuid
 import js
 
-platform = "js"
+platform = "wasm"
 
 if platform != None:
     class RequestHandler:

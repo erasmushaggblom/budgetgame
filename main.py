@@ -9,148 +9,149 @@ import json
 import uuid
 import js
 
-class RequestHandler:
-    """
-    WASM compatible request handler
-    auto-detects emscripten environment and sends requests using JavaScript Fetch API
-    """
+if platform != None:
+    class RequestHandler:
+        """
+        WASM compatible request handler
+        auto-detects emscripten environment and sends requests using JavaScript Fetch API
+        """
 
-    GET = "GET"
-    POST = "POST"
-    _js_code = ""
-    _init = False
+        GET = "GET"
+        POST = "POST"
+        _js_code = ""
+        _init = False
 
-    def __init__(self):
-        self.is_emscripten = sys.platform == "emscripten"
-        if not self._init:
-            self.init()
-        self.debug = True
-        self.result = None
-        if not self.is_emscripten:
-            try:
-                import requests
+        def __init__(self):
+            self.is_emscripten = sys.platform == "emscripten"
+            if not self._init:
+                self.init()
+            self.debug = True
+            self.result = None
+            if not self.is_emscripten:
+                try:
+                    import requests
 
-                self.requests = requests
-            except ImportError:
-                pass
+                    self.requests = requests
+                except ImportError:
+                    pass
 
-    def init(self):
-        if self.is_emscripten:
-            self._js_code = """
-window.Fetch = {}
-// generator functions for async fetch API
-// script is meant to be run at runtime in an emscripten environment
-// Fetch API allows data to be posted along with a POST request
-window.Fetch.POST = function * POST (url, data)
-{
-    // post info about the request
-    console.log('POST: ' + url + 'Data: ' + data);
-    var request = new Request(url, {headers: {'Accept': 'application/json','Content-Type': 'application/json'},
-        method: 'POST',
-        body: data});
-    var content = 'undefined';
-    fetch(request)
-   .then(resp => resp.text())
-   .then((resp) => {
-        console.log(resp);
-        content = resp;
-   })
-   .catch(err => {
-         // handle errors
-         console.log("An Error Occurred:")
-         console.log(err);
-    });
-    while(content == 'undefined'){
-        yield;
+        def init(self):
+            if self.is_emscripten:
+                self._js_code = """
+    window.Fetch = {}
+    // generator functions for async fetch API
+    // script is meant to be run at runtime in an emscripten environment
+    // Fetch API allows data to be posted along with a POST request
+    window.Fetch.POST = function * POST (url, data)
+    {
+        // post info about the request
+        console.log('POST: ' + url + 'Data: ' + data);
+        var request = new Request(url, {headers: {'Accept': 'application/json','Content-Type': 'application/json'},
+            method: 'POST',
+            body: data});
+        var content = 'undefined';
+        fetch(request)
+    .then(resp => resp.text())
+    .then((resp) => {
+            console.log(resp);
+            content = resp;
+    })
+    .catch(err => {
+            // handle errors
+            console.log("An Error Occurred:")
+            console.log(err);
+        });
+        while(content == 'undefined'){
+            yield;
+        }
+        yield content;
     }
-    yield content;
-}
-// Only URL to be passed
-// when called from python code, use urllib.parse.urlencode to get the query string
-window.Fetch.GET = function * GET (url)
-{
-    console.log('GET: ' + url);
-    var request = new Request(url, { method: 'GET' })
-    var content = 'undefined';
-    fetch(request)
-   .then(resp => resp.text())
-   .then((resp) => {
-        console.log(resp);
-        content = resp;
-   })
-   .catch(err => {
-         // handle errors
-         console.log("An Error Occurred:");
-         console.log(err);
-    });
-    while(content == 'undefined'){
-        // generator
-        yield;
-    }
+    // Only URL to be passed
+    // when called from python code, use urllib.parse.urlencode to get the query string
+    window.Fetch.GET = function * GET (url)
+    {
+        console.log('GET: ' + url);
+        var request = new Request(url, { method: 'GET' })
+        var content = 'undefined';
+        fetch(request)
+    .then(resp => resp.text())
+    .then((resp) => {
+            console.log(resp);
+            content = resp;
+    })
+    .catch(err => {
+            // handle errors
+            console.log("An Error Occurred:");
+            console.log(err);
+        });
+        while(content == 'undefined'){
+            // generator
+            yield;
+        }
 
-    yield content;
-}
-            """
+        yield content;
+    }
+                """
+                try:
+                    platform.window.eval(self._js_code)
+                except AttributeError:
+                    self.is_emscripten = False
+
+        @staticmethod
+        def read_file(file):
+            # synchronous reading of file intended for evaluating on initialization
+            # use async functions during runtime
+            with open(file, "r") as f:
+                data = f.read()
+            return data
+
+        @staticmethod
+        def print(*args, default=True):
             try:
-                platform.window.eval(self._js_code)
+                for i in args:
+                    platform.window.console.log(i)
             except AttributeError:
-                self.is_emscripten = False
+                pass
+            except Exception as e:
+                return e
+            if default:
+                print(*args)
 
-    @staticmethod
-    def read_file(file):
-        # synchronous reading of file intended for evaluating on initialization
-        # use async functions during runtime
-        with open(file, "r") as f:
-            data = f.read()
-        return data
+        async def get(self, url, params=None, doseq=False):
+            # await asyncio.sleep(5)
+            if params is None:
+                params = {}
+            if self.is_emscripten:
+                query_string = urlencode(params, doseq=doseq)
+                await asyncio.sleep(0)
+                content = await platform.jsiter(platform.window.Fetch.GET(url + "?" + query_string))
+                if self.debug:
+                    self.print(content)
+                self.result = content
+            else:
+                self.result = self.requests.get(url, params).text
+            return self.result
 
-    @staticmethod
-    def print(*args, default=True):
-        try:
-            for i in args:
-                platform.window.console.log(i)
-        except AttributeError:
-            pass
-        except Exception as e:
-            return e
-        if default:
-            print(*args)
+        # def get(self, url, params=None, doseq=False):
+        #     return await self._get(url, params, doseq)
 
-    async def get(self, url, params=None, doseq=False):
-        # await asyncio.sleep(5)
-        if params is None:
-            params = {}
-        if self.is_emscripten:
-            query_string = urlencode(params, doseq=doseq)
-            await asyncio.sleep(0)
-            content = await platform.jsiter(platform.window.Fetch.GET(url + "?" + query_string))
-            if self.debug:
-                self.print(content)
-            self.result = content
-        else:
-            self.result = self.requests.get(url, params).text
-        return self.result
+        async def post(self, url, data=None):
+            if data is None:
+                data = {}
+            if self.is_emscripten:
+                await asyncio.sleep(0)
+                content = await platform.jsiter(platform.window.Fetch.POST(url, json.dumps(data)))
+                if self.debug:
+                    self.print(content)
+                self.result = content
+            else:
+                self.result = self.requests.post(
+                    url, data, headers={"Accept": "application/json", "Content-Type": "application/json"}
+                ).text
+            return self.result
 
-    # def get(self, url, params=None, doseq=False):
-    #     return await self._get(url, params, doseq)
-
-    async def post(self, url, data=None):
-        if data is None:
-            data = {}
-        if self.is_emscripten:
-            await asyncio.sleep(0)
-            content = await platform.jsiter(platform.window.Fetch.POST(url, json.dumps(data)))
-            if self.debug:
-                self.print(content)
-            self.result = content
-        else:
-            self.result = self.requests.post(
-                url, data, headers={"Accept": "application/json", "Content-Type": "application/json"}
-            ).text
-        return self.result
-
-    # def post(self, url, data=None):
-    #     return await self._post(url, data)
+        # def post(self, url, data=None):
+        #     return await self._post(url, data)
 
 class BudgetGame(): #create class for the game; class includes internal variables that are tracked throughout the game
     def __init__(self):
@@ -211,7 +212,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.main_menu_action = False #checks if main menu button has been clicked
         self.scripts = {} #dictionary containing the scripts chosen in a given round
         self.agency_status = {} #dictionary checking for input-based events
-        self.roundstandard = 2 #how many rounds are played
+        self.roundstandard = 10 #how many rounds are played
         self.round_number = 1 #tracks the number of rounds
         self.roundclicked = 2 #tracks the number of times the player has chosen to advance the round
         self.script_events = [0, 0] #list of events that have occurred in the current round
@@ -237,7 +238,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.show_feedback = False
         self.roundover = False
         self.historical = False
+        self.performance_reports = False
+        self.news_reports = False
         self.history_information = False
+        self.news_information = False
         self.rankings = False
         self.roundsummary1 = False
         self.roundsummary2 = False
@@ -300,7 +304,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.show_feedback = True
         self.roundover = False
         self.historical = False
+        self.performance_reports = False
+        self.news_reports = False
         self.history_information = False
+        self.news_information = False
         self.roundsummary1 = False
         self.roundsummary2 = False
         self.roundsummary3 = False
@@ -438,9 +445,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.adjust_agency_budget(i[0], 1000)
             self.adjust_ranking()
             self.historical_rankings.append(self.schoolranking)
-
-
-
+        
 
     def check_score(self): #checks the current player score
         list1 = []
@@ -816,6 +821,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
     def post_output(self):
+        if platform == None:
+            return
         string1 = ""
         identity = self.id
 
@@ -825,7 +832,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         post_dict = {identity: string1}       
         output = RequestHandler()
         # Define the URL and data for the POST request
-        url = "https://httpbin.org/post"
+        url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
         data = post_dict
         # Send the POST request
         asyncio.run(output.post(url, data))
@@ -882,6 +889,18 @@ class BudgetGame(): #create class for the game; class includes internal variable
         for i in self.agencies:
             self.agency_events[i[0]] = []
 
+    def create_historical_rankings(self):
+
+        for u in range (20):
+            rangelimit = 0
+            ranking_scores = []
+            for i in self.ranking_schools:
+                score = random.randrange(rangelimit, 100)
+                rangelimit += 5
+                ranking_scores.append((score, i))
+                ranking_scores.sort()
+            self.historical_rankings.append(ranking_scores)
+
     def create_ranking(self):
         agencies = []
         for i in self.agencies:
@@ -892,7 +911,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             agencies.append(i)
         self.ranking_schools = agencies
         self.adjust_ranking()
-
 
     def adjust_ranking(self):
         agencies = []
@@ -1440,6 +1458,44 @@ class BudgetGame(): #create class for the game; class includes internal variable
             y = 100
             x = 100
             counter = 1
+        if condition == "reporting":
+            rect1 = (x, y, boxwidth, boxheight)
+            if self.agency == "null":
+                pygame.draw.rect(self.window, self.tan, rect1)
+            text1 = self.arial.render("Please click on the school you wish", True, self.black)
+            self.window.blit(text1, (x+10, y+10))
+            text2 = self.arial.render("to see news reporting on", True, self.black)
+            self.window.blit(text2, (x+10, y+40))
+            y += boxheight + 50
+            rect3 = (x, y, boxwidth, boxheight)
+            pygame.draw.rect(self.window, self.tan, rect3)
+            text = self.arial.render("Click here to return to main menu", True, self.black)
+            self.window.blit(text, (x+10, y+10))
+            y = 100
+            x = 100
+            counter = 1
+        if condition == "reports":
+            rect1 = (x, y, boxwidth, boxheight)
+            pygame.draw.rect(self.window, self.tan, rect1)
+            text1 = self.arial.render("Please click here if you would like", True, self.black)
+            self.window.blit(text1, (x+10, y+10))
+            text2 = self.arial.render("to see information on historical performance", True, self.black)
+            self.window.blit(text2, (x+10, y+40))
+            y += boxheight + 50
+            rect2 = (x, y, boxwidth, boxheight)
+            pygame.draw.rect(self.window, self.tan, rect2)
+            text1 = self.arial.render("Please click here if you would like", True, self.black)
+            self.window.blit(text1, (x+10, y+10))
+            text2 = self.arial.render("to see news reports on schools", True, self.black)
+            self.window.blit(text2, (x+10, y+40))
+            y += boxheight + 50
+            rect3 = (x, y, boxwidth, boxheight)
+            pygame.draw.rect(self.window, self.tan, rect3)
+            text = self.arial.render("Click here to return to main menu", True, self.black)
+            self.window.blit(text, (x+10, y+10))
+            y = 100
+            x = 100
+            counter = 1
         if condition == "summary":
             if self.round_number != 1:
                 rect1 = (x, y, boxwidth, boxheight)
@@ -1525,8 +1581,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     counter += 1
                     y2 += self.radius2*2 + 10
 
-
-        return (rect3, rounds)
+        if condition == "reports":
+            return (rect1, rect2, rect3)
+        else:
+            return (rect3, rounds)
 
 
     def show_information(self, agency, condition): #shows either performance information or a summary
@@ -1897,6 +1955,16 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.roundchoice = "null"
                 self.add_to_output("rankings back button clicked")
                 self.roundend()
+
+        if summary == 6:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.history_information = False
+                self.historical = True
+                self.agency = "null"
+                self.add_to_output("Historical ranking back button clicked")
 
     def show_agency_summary(self, roundnumber):
         if self.click_summary == True:
@@ -2366,8 +2434,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.window.fill(self.white)
         self.draw_game_board()
         self.draw_agency_menu(menu_options)
-        summarybuttons = self.draw_summary_prompts("historical")
-        rect = summarybuttons[0]
+        summarybuttons = self.draw_summary_prompts("reports")
+        rect1 = summarybuttons[0]
+        rect2 = summarybuttons[1]
+        rect3 = summarybuttons[2]
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -2376,7 +2446,41 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     xy = pygame.mouse.get_pos()
                     x = xy[0]
                     y = xy[1]
-                    if self.click_box(x, y, rect) == True:
+                    if self.click_box(x, y, rect1) == True:
+                        self.historical = True
+                        self.performance_reports = False
+                        self.add_to_output("summary historical performance clicked")
+                    if self.click_box(x, y, rect2) == True:
+                        self.news_reports = True
+                        self.performance_reports = False
+                        self.add_to_output("summary reports button clicked")
+                    if self.click_box(x, y, rect3) == True:
+                        self.baseconditions()
+                        self.add_to_output("summary back button clicked")
+                           
+
+
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def reporting_choice(self, menu_options, choice):
+        self.window.fill(self.white)
+        self.draw_game_board()
+        self.draw_agency_menu(menu_options)
+        if choice == "historical":
+            summarybuttons = self.draw_summary_prompts("historical")
+        if choice == "reporting":
+            summarybuttons = self.draw_summary_prompts("reporting")
+        rect1 = summarybuttons[0]
+        pygame.display.update()
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    if self.click_box(x, y, rect1) == True:
                         self.baseconditions()
                         self.add_to_output("summary back button clicked")
 
@@ -2387,18 +2491,113 @@ class BudgetGame(): #create class for the game; class includes internal variable
                             self.agency = agency
                             
                     if self.agency != "null":
-                            self.historical = False
-                            self.history_information = True
-                            self.show_agencies = False
-
-                            
-
+                            if choice == "historical":
+                                self.historical = False
+                                self.history_information = True
+                                self.show_agencies = False
+                            if choice == "reporting":
+                                self.news_reports = False
+                                self.show_agencies = False  
+                                self.news_information = True
 
             if event.type == pygame.QUIT:
                 self.finish_game()
 
-
     def historical_performance(self, agency):
+        count = 0
+        results = []
+        for i in self.historical_rankings:
+            count += 1
+        count -= 10
+        if count > -2:
+            rankings_used = self.historical_rankings[count:]
+        count2 = 20
+        for i in rankings_used:
+            for u in i:
+                if u[1] == agency:
+                    results.append((u[0], u[1], count2))    
+                count2 -= 1
+                if count2 == 0:
+                    count2 = 20     
+        rankings_used.reverse()
+        if self.endrankings == False:
+            rect1 = self.draw_exit("previous")
+        texts = []
+        x = 150
+        x1 = x-20
+        y = 50
+        y1 = y-5
+        boxheight3 = 25
+        boxwidth = 700
+        count = 1
+        agencies = []
+        text = self.arial2.render(f"These are the ranking places for {agency} over the previous ten semesters, newest results first:", True, self.black)
+        texts.append((text, (x, y)))
+        pygame.draw.rect(self.window, self.darkolivegreen3, (x1, y1, boxwidth, boxheight3))
+        y += 50
+        y1 += 50
+
+        semester_tracker = 1
+        year = 2023
+        performances = []
+        rankings = []
+        for i in results:
+            performance = i[0]
+            performances.append(performance)
+            ranking = i[2]
+            rankings.append(ranking)
+            colour_box = self.gainsboro
+            if ranking < 6:
+                colour_box = self.forestgreen
+            if ranking > 15:
+                colour_box = self.crimson
+            text = self.arial2.render(f"Ranking semester {semester_tracker}, {year}: {ranking}, performance score: {performance}", True, self.black)
+            texts.append((text, (x, y)))
+            pygame.draw.rect(self.window, colour_box, (x1, y1, boxwidth, boxheight3))
+            y += 40
+            y1 += 40
+            semester_tracker += 1
+            if semester_tracker > 2:
+                semester_tracker = 1
+                year -= 1
+
+        y += 20
+        y1 += 20
+        average_performance = int((sum(performances))/10)
+        average_ranking = int((sum(rankings))/10)
+        text = self.arial2.render(f"Average ranking in the last 10 semesters: {average_ranking}", True, self.black)
+        texts.append((text, (x, y)))
+        colour_box = self.gold
+        if average_ranking < 6:
+            colour_box = self.forestgreen
+        if average_ranking > 15:
+            colour_box = self.tomato
+        pygame.draw.rect(self.window, colour_box, (x1, y1, boxwidth, boxheight3))
+        y += 40
+        y1 += 40
+        text = self.arial2.render(f"Average performance score in the last 10 semesters: {average_performance}", True, self.black)
+        texts.append((text, (x, y)))
+        colour_box = self.gold
+        if average_performance < 25:
+            colour_box = self.forestgreen
+        if average_performance > 75:
+            colour_box = self.tomato
+        pygame.draw.rect(self.window, colour_box, (x1, y1, boxwidth, boxheight3))
+
+        for i in texts:
+            self.window.blit(i[0], i[1])
+
+        for event in pygame.event.get(): #checks game events; at the moment only click-based events are taken into consideration
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.increase_click_counter()
+                if event.button == 1:
+                    self.summary_click_forward(6, rect1)
+
+
+    def news_summary(self, agency):
         self.window.fill(self.white)
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -2407,8 +2606,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     xy = pygame.mouse.get_pos()
                     x = xy[0]
                     y = xy[1]
-                    self.add_to_output("historical performance back button clicked")
+                    self.add_to_output("news reports back button clicked")
                     self.baseconditions()
+
+                    "historical ranking performance"
+                    "news reports"
+
 
             if event.type == pygame.QUIT:
                 self.finish_game()
@@ -2468,28 +2671,17 @@ class BudgetGame(): #create class for the game; class includes internal variable
         x1 = x-20
         y = 50
         y1 = y-5
-
         boxheight3 = 25
-        boxwidth3 = 100
         boxwidth = 700
-        scores = []
-        names = []
         count = 1
-
         agencies = []
-        ranking_scores = []
-        rangelimit = 0
-
-
         text = self.arial2.render(f"This is the school ranking for semester {self.roundchoice} of all schools in the region. Your schools are highlighted.", True, self.black)
         texts.append((text, (x, y)))
         pygame.draw.rect(self.window, self.darkolivegreen3, (x1, y1, boxwidth, boxheight3))
         y += 50
         y1 += 50
-
         for i in self.agencies:
             agencies.append(i[0])
-
         for i in ranking:
             if i[1] in agencies:
                 colour_box = self.gold
@@ -2517,7 +2709,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.summary_click_forward(5, rect1)
                     else:
                         self.summary_click_forward(4, rect1)
-                    self.add_to_output("Semester summary forward button clicked")
+                    self.add_to_output("Ranking forward button clicked")
 
     def menu_option_7(self): #optional function for another menu item (currently removed)
         self.agency = self.agencynames[3]
@@ -3494,6 +3686,7 @@ game.create_agency_stats()
 game.check_score()
 game.create_ranking()
 game.post_output()
+game.create_historical_rankings()
 game.historical_rankings.append(game.schoolranking)
 pygame.font.get_fonts()
 game.menu_options = game.create_game_menu() #creates the agency selection menu
@@ -3547,7 +3740,7 @@ async def main():
         if game.roundsummary7 == True:
             game.agency = game.agencynames[6]
             game.menu_option_4()
-        if game.historical == True:
+        if game.performance_reports == True:
             game.menu_option_5(game.menu_options)
         if game.rankings == True:
             game.menu_option_6(game.menu_options)
@@ -3555,6 +3748,8 @@ async def main():
             game.show_performance_rankings()
         if game.history_information == True:
             game.historical_performance(game.agency)
+        if game.news_information == True:
+            game.news_summary(game.agency)
         if game.show_agencies == True:
             game.check_status()
             game.draw_agency_menu(game.menu_options)
@@ -3570,6 +3765,10 @@ async def main():
             game.show_postgame()
         if game.roundover == True:
             game.round_summary()
+        if game.historical == True:
+            game.reporting_choice(game.menu_options, "historical")
+        if game.news_reports == True:
+            game.reporting_choice(game.menu_options, "reporting")
         if game.show_feedback == True:
             for i in feedback:
                 game.draw_feedback(i, ("cornsilk"))
@@ -3691,7 +3890,7 @@ async def main():
                             game.caption7 = True
                         if game.choice == 4:
                             game.add_to_output("menu option 5 clicked")
-                            game.historical = True
+                            game.performance_reports = True
                         if game.choice == 5:
                             game.add_to_output("menu option 6 clicked")
                             game.rankings = True

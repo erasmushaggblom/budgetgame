@@ -9,6 +9,8 @@ import json
 import uuid
 import js
 
+platform = "js"
+
 if platform != None:
     class RequestHandler:
         """

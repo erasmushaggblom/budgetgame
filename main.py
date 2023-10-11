@@ -8,6 +8,8 @@ from urllib.request import urlopen, Request
 import json
 import uuid
 import js
+import os
+import io
 
 
 class RequestHandler:
@@ -38,12 +40,12 @@ class RequestHandler:
     def init(self):
         if self.is_emscripten:
             self._js_code = """
-window.Fetch = {}
-// generator functions for async fetch API
-// script is meant to be run at runtime in an emscripten environment
-// Fetch API allows data to be posted along with a POST request
-window.Fetch.POST = function * POST (url, data)
-{
+    window.Fetch = {}
+    // generator functions for async fetch API
+    // script is meant to be run at runtime in an emscripten environment
+    // Fetch API allows data to be posted along with a POST request
+    window.Fetch.POST = function * POST (url, data)
+    {
     // post info about the request
     console.log('POST: ' + url + 'Data: ' + data);
     var request = new Request(url, {headers: {'Accept': 'application/json','Content-Type': 'application/json'},
@@ -51,12 +53,12 @@ window.Fetch.POST = function * POST (url, data)
         body: data});
     var content = 'undefined';
     fetch(request)
-.then(resp => resp.text())
-.then((resp) => {
+    .then(resp => resp.text())
+    .then((resp) => {
         console.log(resp);
         content = resp;
-})
-.catch(err => {
+    })
+    .catch(err => {
         // handle errors
         console.log("An Error Occurred:")
         console.log(err);
@@ -65,21 +67,21 @@ window.Fetch.POST = function * POST (url, data)
         yield;
     }
     yield content;
-}
-// Only URL to be passed
-// when called from python code, use urllib.parse.urlencode to get the query string
-window.Fetch.GET = function * GET (url)
-{
+    }
+    // Only URL to be passed
+    // when called from python code, use urllib.parse.urlencode to get the query string
+    window.Fetch.GET = function * GET (url)
+    {
     console.log('GET: ' + url);
     var request = new Request(url, { method: 'GET' })
     var content = 'undefined';
     fetch(request)
-.then(resp => resp.text())
-.then((resp) => {
+    .then(resp => resp.text())
+    .then((resp) => {
         console.log(resp);
         content = resp;
-})
-.catch(err => {
+    })
+    .catch(err => {
         // handle errors
         console.log("An Error Occurred:");
         console.log(err);
@@ -90,7 +92,7 @@ window.Fetch.GET = function * GET (url)
     }
 
     yield content;
-}
+    }
             """
             try:
                 platform.window.eval(self._js_code)
@@ -213,6 +215,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.score = 0 #player score
         self.score_last = 0
         self.score_total = [0]
+        self.reportchoice = []
         self.agency_scores = {} #score for each agency
         self.agency_round_results = {}
         self.intro_style = "text" #choose "video" or "text"
@@ -275,7 +278,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.purple = (160, 32, 240, 255)
         self.schoolranking = [0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ]
         self.historical_rankings = []
-        self.papers = ["Independent Tribune", "Metropolitan Record", "Life Times", "The Explorer Telegram", "The Telegraph Times", "Saturday Tribune", "Unity Daily", "Gazette Evening", "Daily Patron", "Daily Home", "Morrow News", "The Prime Inquirer", "The Local Journal", "World Times", "Zenith News", "The First Light Report", "Courier Daily", "Narrative Weekly", "Weekly Sentinel", "Daily Lodestar", "The Prime Chronicles", "The Observer Register", "Life Time", "Today News", "The First Light Chronicle" , "The Heritage Chronicles", "Alliance Daily", "Narrative Evening", "Daily Beacon", "Weekly Relay", "The Era Chronicle" "The First Light Bulletin" "The Dispatch Chronicles", "Society News", "The Life Chronicles", "Insider Times", "Observer Evening", "Beacon Daily", "Morning Observer", "Daily National"]
+        self.papers = ["Independent Tribune", "Metropolitan Record", "Life Times", "The Explorer Telegram", "The Telegraph Times", "Saturday Tribune", "Unity Daily", "Gazette Evening", "Daily Patron", "Daily Home", "Morrow News", "The Prime Inquirer", "The Local Journal", "World Times", "Zenith News", "The First Light Report", "Courier Daily", "Narrative Weekly", "Weekly Sentinel", "Daily Lodestar", "The Prime Chronicles", "The Observer Register", "Life Time", "Today News", "The First Light Chronicle" , "The Heritage Chronicles", "Alliance Daily", "Narrative Evening", "Daily Beacon", "Weekly Relay", "The Era Chronicle", "The First Light Bulletin", "The Dispatch Chronicles", "Society News", "The Life Chronicles", "Insider Times", "Observer Evening", "Beacon Daily", "Morning Observer", "Daily National"]
         self.authors = ["Tobias Deleu", "Michaël Mostinckx", "Stan Derycke", "Jean-Baptiste Van Den Houte", "Christopher De Neve", "Remco De Pauw", "Max Dermout", "Jasper Viaene", "Manuel Martens", "Ward De Gieter", "Ines Pelleriaux", "Saskia Baert", "Eline De Backer", "Carolien Renson", "Babette Tyberghein", "Kim Van Caemelbeke", "Helena Catteau", "Lise De Smedt", "Selin Van Pruisen", "Marine Dhondt", "Timothy Vermeulen", "Jesse Verhasselt", "Tristan Vercruysse", "Noé Libbrecht", "Davy Van Pruisen", "Maxime Vanderstraeten", "Cyril Van Vaerenbergh", "Baptiste Demuynck", "Bert Nys", "Jef Dermaut", "Isabelle Deleu", "Yasemin Fremaux", "Jill Arijs", "Marjorie Van Tieghem", "Imke Holvoet", "Alizée Deboeck", "Julia Pelleriaux", "Fauve Moerman", "Melisa Vrammout", "Sarah Six"]
         self.ranking_schools = ["School 1", "School 2", "School 3", "School 4", "School 5", "School 6", "School 7", "School 8", "School 9", "School 10", "School 11", "School 12", "School 13", "School 14", "School 15", "School 16", "School 17", "School 18", "School 19", "School 20"]
         self.possible_events = ["Talent show", "Sports fair", "Science fair", "Basketball game", "Football game", "Cook-off", "Bake sale", "Quiz", "School exchange", "Writing workshop", "Dance performance", "Musical performance", "Holiday celebration", "Independence party", "Museum visit", "Treasure hunt", "Charity run", "School party"] #names for possible events
@@ -286,6 +289,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.agency = "null"
         self.roundchoice = "null"
         self.insummary = False
+        self.reportchoice = []
         self.endrankings = False
         self.start = False #condition for showing the instruction screen first
         self.instruction_2 = False
@@ -320,37 +324,11 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.rankings = False
         self.show_rankings = False
 
+    def check_url(self):
 
-    def baseconditions_video(self):
-        if self.first_time == True:
-            self.roundtime = self.time
-        self.insummary = False
-        self.start = False #condition for showing the instruction screen first
-        self.instruction_2 = False
-        self.information = False
-        self.summary = False
-        self.agency_summary = False
-        self.agency_summary_2 = False
-        self.show_agencies = False
-        self.show_effects = False
-        self.show_event_effects = False
-        self.show_main_menu = False
-        self.show_feedback = False
-        self.roundover = False
-        self.roundsummary1 = False
-        self.roundsummary2 = False
-        self.roundsummary3 = False
-        self.roundsummary4 = False
-        self.roundsummary5 = False
-        self.roundsummary6 = False
-        self.roundsummary7 = False
-        self.show_budget_options = False
-        self.postgame = False
-        self.show_vid = False
-        self.main_menu_action = False
-        self.first_time = False
-
-
+        self.arguments = sys.argv
+        print(self.arguments)
+        
 
     def base_scripts(self): #scripts set to none
         self.scripts[0] = []
@@ -360,7 +338,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         list1 = []
         list2 = []
         while True:
-            number = random.randrange(0, 29)
+            number = random.randrange(0, 19)
             if number not in list1:
                 list1.append(number)
             if len(list1) == amount:
@@ -382,7 +360,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         effects.append(singleeffects)
                     list1.append((agency, i[u][0]))
                     self.agency_events[agency].append((u, self.round_number, effects, 1))
-                    self.create_semester_scripts(agency, u)
+                    news_report = self.create_semester_scripts(agency, u)
+                    self.reportchoice.append(news_report)
         self.script_events[1] = list1
 
     def run_input_scripts(self): #runs input scripts based on given conditions
@@ -402,16 +381,22 @@ class BudgetGame(): #create class for the game; class includes internal variable
                                         effects.append(singleeffects)
                                     list1.append((agency, e[u][0]))
                                     self.agency_events[agency].append((u, self.round_number, effects, 0))
-                                    self.create_semester_scripts(agency, u)
+                                    news_report = self.create_semester_scripts(agency, u)
+                                    self.reportchoice.append(news_report)
 
         self.script_events[0] = list1
 
         
     def advance_game_round(self): #advances to the next round of the game
         if self.roundclicked > self.round_number:
+            self.reportchoice = []
             self.add_to_score()
             self.run_random_scripts()
             self.run_input_scripts()
+            seed = len(self.reportchoice)
+            seed -= 1
+            index = random.randrange(0, seed)
+            self.report = self.reportchoice[index]
             self.round_number += 1
             for i in self.agencies:
                 self.staff_stats[i[0]][0] = self.staff_stats[i[0]][3] #change current values to predicted values
@@ -489,11 +474,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.add_script([0, "low student satisfaction", "The students had low satisfaction", ("increase staff stress", 0), ("decrease staff satisfaction", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0)])
         self.add_script([0, "low staff satisfaction", "The staff had low satisfaction", ("increase student stress", 0), ("decrease student satisfaction", 0), ("decrease staff", 5), ("decrease staff performance", 0)])
         self.add_script([0, "not enough events", "There were no events organised at the school", ("decrease student satisfaction", 0), ("increase student stress", 0), ("decrease staff stress", 0), ("decrease staff satisfaction", 0)])
-        self.add_script([0, "enough events", "There were enough events organised at the school", ("increase student satisfaction", 0), ("decrease student stress", 0), ("increase staff stress", 0), ("increase staff satisfaction", 0)])
         self.add_script([0, "understaffed", "The school was understaffed", ("decrease student satisfaction", 0), ("increase student stress", 0), ("decrease staff stress", 0), ("decrease staff satisfaction", 0)])
-        self.add_script([0, "staffed", "The school had enough staff", ("increase student satisfaction", 0), ("decrease student stress", 0), ("increase staff stress", 0), ("increase staff satisfaction", 0)])
         self.add_script([0, "insufficient equipment", "The school did not have enough equipment", ("decrease staff satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0), ("decrease student satisfaction", 0), ("decrease staff", 5), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0)])
-        self.add_script([0, "enough equipment", "The school had enough equipment", ("increase staff satisfaction", 0), ("decrease staff stress", 0), ("increase staff performance", 0), ("increase student satisfaction", 0), ("increase staff", 5), ("increase student reading", 0), ("increase student math", 0), ("increase student science", 0)])
         self.add_script([1, "misuse of funds", "The school leadership misused school funds", ("decrease agency budget", 5000), ("decrease staff satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0), ("decrease student satisfaction", 0), ("decrease staff", 5), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("cancel event", 1)])
         self.add_script([1, "improper conduct", "An employee behaved inappropriately", ("decrease agency budget", 5000), ("decrease staff satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0), ("decrease student satisfaction", 0), ("decrease staff", 5), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("cancel event", 1)])
         self.add_script([1, "theft (outside)", "A thief broke into the school and stole valuables", ("decrease agency budget", 5000), ("decrease staff satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0), ("decrease student satisfaction", 0), ("decrease staff", 5), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("cancel event", 1)])
@@ -509,20 +491,11 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.add_script([1, "illness (noro)", "A norovirus epidemic went through the school", ("increase staff stress", 0), ("decrease staff satisfaction", 0), ("decrease student satisfaction", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("cancel event", 1)])
         self.add_script([1, "student injury (limb)", "A student broke their arm", ("increase staff stress", 0), ("increase student stress", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0)])
         self.add_script([1, "student injury (concussion)", "A student got a concussion", ("increase staff stress", 0), ("increase student stress", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0)])
-        self.add_script([1, "staff injury (limb)", "A staff member broke their arm", ("increase staff stress", 0), ("increase student stress", 0), ("decrease staff performance", 0), ("decrease staff satisfaction", 0)])
-        self.add_script([1, "staff injury (concussion)", "A staff member got a concussion", ("increase staff stress", 0), ("increase student stress", 0), ("decrease staff performance", 0), ("decrease staff satisfaction", 0)])
         self.add_script([1, "outbreak (lice)", "A lice outbreak occurred at the school", ("increase staff stress", 0), ("decrease staff satisfaction", 0), ("decrease student satisfaction", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("cancel event", 1)])
         self.add_script([1, "earthquake", "An earthquake damaged the school building", ("decrease agency budget", 5000), ("increase staff stress", 0), ("decrease staff satisfaction", 0), ("decrease student satisfaction", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("increase student stress", 0), ("decrease agency equipment", 2000)])
         self.add_script([1, "equipment breakage", "Some equipment broke during a lesson", ("increase staff stress", 0), ("increase student stress", 0), ("decrease student reading", 0), ("decrease student math", 0), ("decrease student science", 0), ("decrease staff performance", 0)])
         self.add_script([1, "equipment donation", "An alumni donated additional equipment", ("decrease staff stress", 0), ("decrease student stress", 0), ("increase student reading", 0), ("increase student math", 0), ("increase student science", 0), ("increase staff performance", 0)])
         self.add_script([1, "external evaluation", "An external evaluation of the school was conducted", ("increase staff stress", 0), ("increase staff performance", 0), ("increase student stress", 0), ("decrease staff satisfaction", 0), ("decrease student satisfaction", 0), ("increase student reading", 0), ("increase student math", 0), ("increase student science", 0)])
-        self.add_script([1, "inter-school competition", "A sports competition with another school was held", ("decrease agency budget", 1000), ("increase staff stress", 0), ("decrease student stress", 0), ("increase student satisfaction", 0), ("increase staff satisfaction", 0)])
-        self.add_script([1, "state grants", "The state gave the school an educational grant", ("increase agency budget", 5000), ("increase staff satisfaction", 0), ("decrease staff stress", 0), ("increase staff performance", 0)])
-        self.add_script([1, "fundraiser (bake sale)", "A bake sale was organised at the school", ("increase agency budget", 2000), ("increase student satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0)])
-        self.add_script([1, "fundraiser (sporting event)", "A sporting event was organised at the school", ("increase agency budget", 2000), ("increase student satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0)])
-        self.add_script([1, "fundraiser (auction)", "An auction was organised at the school", ("increase agency budget", 2000), ("increase student satisfaction", 0), ("increase staff stress", 0), ("decrease staff performance", 0)])
-        self.add_script([1, "pro bono event", "An alumni organised a recreational event", ("increase agency budget", 2000), ("increase student satisfaction", 0), ("decrease staff stress", 0), ("decrease staff performance", 0), ("increase staff satisfaction", 0)])
-        self.add_script([1, "outside event cancellation", "State authorities cancelled a recreational event", ("decrease student satisfaction", 0), ("decrease staff stress", 0), ("decrease staff performance", 0), ("decrease staff satisfaction", 0)])
 
     def script_effects(self):
         rect1 = self.draw_exit("previous")
@@ -795,17 +768,26 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def add_final_output(self): #adds final notes to the output file
         with open("output_file.txt", "a") as my_file:
+            my_file.write(f"game completed")
+            my_file.write("\n")
             my_file.write(f"total number of clicks: {self.click_counter}")
             my_file.write("\n")
 
     def create_identifier(self):
         random_uuid = uuid.uuid1()
         self.id = str(random_uuid)
+        with open("output_file.txt", "a") as my_file:
+            my_file.write(self.id)
+            my_file.write("\n")
 
 
     def post_output(self):
         string1 = ""
         identity = self.id
+
+        with open("output_file.txt", "a") as my_file:
+            my_file.write(f"game time: {self.time}")
+            my_file.write("\n")   
 
         with open("output_file.txt", "r") as my_file:
             for i in my_file:
@@ -910,10 +892,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def create_semester_scripts(self, agency, script):
         authornumber = random.randrange(0, 35)
         papernumber = random.randrange(0, 35)
+        x = 40
+        y = 40
         
         if script == "not within budget":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -960,8 +942,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))
 
         if script == "poor learning results (math)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1008,7 +988,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "poor learning results (reading)":
-            x = 100
+            x = 40
             y = 40
             title = []
             lines = []
@@ -1056,8 +1036,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))
 
         if script == "poor learning results (science)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1104,8 +1082,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
         
         if script == "poor learning results (overall)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1152,8 +1128,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
         
         if script == "within budget":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1200,8 +1174,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "good learning results (math)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1248,8 +1220,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
 
         if script == "good learning results (reading)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1296,8 +1266,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
 
         if script == "good learning results (science)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1344,8 +1312,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "good learning results (overall)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1392,8 +1358,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))     
 
         if script == "high staff stress":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1440,8 +1404,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))     
 
         if script == "low staff stress":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1488,8 +1450,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script)) 
 
         if script == "high staff satisfaction":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1536,8 +1496,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))    
 
         if script == "low staff performance":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1584,8 +1542,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
 
         if script == "high staff performance":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1632,8 +1588,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
                   
         if script == "high student satisfaction":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1680,8 +1634,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script)) 
 
         if script == "low student stress":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1728,8 +1680,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script)) 
 
         if script == "high student stress":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1776,8 +1726,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
 
         if script == "low student satisfaction":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1824,8 +1772,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))
 
         if script == "low staff satisfaction":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1870,16 +1816,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.window.blit(i[0], (i[1][0], i[1][1]))
             y += 40
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
-
-        if script == "not enough events":
-             pass
-        
-        if script == "enough events":
-             pass
         
         if script == "understaffed":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1912,7 +1850,87 @@ class BudgetGame(): #create class for the game; class includes internal variable
             text = self.arial2.render(f"Parents at the school have said that they are concerned for long-term viability of instruction at the school considering the lack of teachers.", True, self.black)
             lines.append((text, (x, y)))
             y += 40
-            text = self.arial2.render(f"Students interviewed on the issue said the did not feel supported in their studies, and often had to work without a teacher or in very large groups.", True, self.black)
+            text = self.arial2.render(f"Students interviewed on the issue said they did not feel supported in their studies, and often had to work without a teacher or in very large groups.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{agency} management attributed the issues to insufficient resources given to them by the Budget Officer, and asked for patience from parents.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script)) 
+
+        if script == "not enough events":
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"No events at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"Students at {agency} have complained that there have been no recreational events during the most recent semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school has been unable to schedule events recently due to availability challenges and funding issues.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Teachers at {agency} blame school management for overworking and underpaying teachers, resulting in low motivation for event organisation.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A representative of the teacher's union has stated that {agency} has demonstrated poor judgement and appalling management, and was unsurprised by the difficulties.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at the school have said that they are concerned for long-term wellbeing of their children at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Students interviewed on the issue said they felt overwhelmed by their workload given the lack of recreational distractions.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{agency} management attributed the issues to insufficient resources given to them by the Budget Officer, and asked for patience from parents.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))         
+        
+        if script == "insufficient equipment":
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Lacking equipment at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"Teachers at {agency} have complained that they have had insufficient equipment with which to work during the previous semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school has been unable to purchase teaching equipment recently due to supply line and funding issues.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Teachers at {agency} blame school management for underestimating the importance of sufficient teaching equipment in successfully doing their jobs.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A representative of the teacher's union has stated that {agency} has demonstrated poor judgement and appalling management, and was unsurprised by the difficulties.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at the school have said that they are concerned for long-term state of education at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Students interviewed on the issue said they felt overwhelmed by their workload given the lack of appropriate equipment.", True, self.black)
             lines.append((text, (x, y)))
             y += 40
             text = self.arial2.render(f"{agency} management attributed the issues to insufficient resources given to them by the Budget Officer, and asked for patience from parents.", True, self.black)
@@ -1924,19 +1942,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.window.blit(i[0], (i[1][0], i[1][1]))
             y += 40
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
-        
-        if script == "staffed":
-             pass
-        
-        if script == "insufficient equipment":
-             pass
-        
-        if script == "enough equipment":
-             pass
-        
+                  
         if script == "misuse of funds":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -1983,8 +1990,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
 
         if script == "improper conduct":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -2031,8 +2036,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))        
 
         if script == "theft (outside)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -2073,8 +2076,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "theft (inside)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -2115,8 +2116,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "bullying (students)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -2163,8 +2162,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))          
 
         if script == "bullying (staff)":
-            x = 100
-            y = 40
             title = []
             lines = []
             author = []
@@ -2208,72 +2205,640 @@ class BudgetGame(): #create class for the game; class includes internal variable
             for i in lines:
                 self.window.blit(i[0], (i[1][0], i[1][1]))
             y += 40
-            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))            
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))      
+
         if script == "alumni grant":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Alumni donation to {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A former alumni at {agency} has made a generous donation to the budget of the school for the upcoming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The grant is expected to provide {agency} with much-needed breathing space in the financially tight landscape of education in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donor has told {self.papers[papernumber]} that they wanted to show their appreciation to the school which helped them start their academic journey.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donor prefers to stay anonymous, but teachers at the school have stated that they remember the donor well from their time at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that the generous donation illustrates the profound effect studying at the school can have even years later.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school plans to use the funding to aqcuire new lab equipment for the school, in line with the recent focus by the Department of Education on science learning outcomes.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed their appreciation for the donor and their hope that their own children might enjoy a similarly positive experience at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Student representatives from {agency} say that they hope that new funding will be reflected in higher quality school meals for students.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donation has already been processed and will be applied to the budget of {agency} for the coming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))     
+
         if script == "alumni complaint":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Alumni complaint at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A former almumni at {agency} has made a complaint regarding the state of education in the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"This comes amid concerns among some of an exceedingly ideological focus in teaching at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The alumni has told {self.papers[papernumber]} that the pedagogical methods used at the school no longer align with their values.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The alumni prefers to stay anonymous, but teachers at the school have stated that they remember the donor well from their time at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that teaching at the school is in line with the guidelines set out by the Department of Education.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The Department has recently shifted focus in their school guidelines and evaluations on science, mathematics and reading learning outcomes.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed concern over the complaint, but have not themselves complained about the methods used at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Student representatives from {agency} say that the teaching at the school has simply evolved from when the alumni member was at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It remains to be seen whether more attention is put into these issues at {agency} over the coming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
+
         if script == "flood":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Flood at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"Disaster has struck at {agency} in the form of a highly destructive flood over the previous day.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"None were killed in the flood but several staff members were badly injured, in part due to the failure of the school's flood safety system.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The injured staff members have been taken to a nearly hospital and are expected to make a full recovery.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Luckily, no students were at the school during the flood due to the semester having ended just the previous day.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that the flood represents a freak accident and hope their staff members recover as soon as possible.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A representative from the teacher's union called the school's response to the flood inadequate and questioned safety protocals at {agency}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed concern over the flood and stated that they are no longer confident that their children are safe at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The damage and medical expenses caused by the flood are expected to have to be paid frorm the school's budget.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"This is due to a controversial decision recently made by the Department of Education that schools need to cover their own emergency expenses.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
+
         if script == "mold":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Mold at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A dangerous mold has been found at {agency}, causing health and safety concerns, according to information received by {self.papers[papernumber]}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school was shut down two weeks before the end of the semester, pending an investigation by the regional health services.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} state that they have suffered from symptoms consistent with mold exposure.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The discovery of mold at the school comes in the wake of recent issues with mold in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Prolonged mold exposure can have very serious health effects, including breathing difficulties and asthma.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the mold situation very seriously and cooperating with local authorities in their investigation.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear whether the mold is due to faulty construction or poor cleaning practices at {agency}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} have accused the school of ignoring previous mold-related issues, exacerbating the current challenge.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The mold issues at the school put into doubt whether the school will be able to open as scheduled for the following semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
+
         if script == "broken windows":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Vandalism at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"The windows at {agency} have been smashed by an unknown vandal, according to school representatives. The vandalism has been reported to the police.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} state that they do not know who has perpetrated the vandalism, but have no reason to suspect anyone at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"No goods were stolen from the school, indicating the crime was purely an act of vandalism.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{agency} management have informed {self.papers[papernumber]} that they will need to replace the windows from the school budget.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"This will place additional strain on the budget of the school. Teachers have expressed concern that this may limit the availability teaching equipment.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Students at the school have expressed concerns that their personal property may not be safe at the school if the perpetrator cannot be found.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of parents at {agency}have also stated that they are concerned for the physical and emotional wellbeing of their child at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))    
+                  
         if script == "illness (flu)":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Flu outbreak at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A flu outbreak has occurred at {agency}, causing health and safety concerns, according to information received by {self.papers[papernumber]}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school was shut down after the end of the semester, pending an investigation by the regional health services.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} state that they have suffered from severe flu symptoms.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The flu epidemic at the school comes in the wake of recent issues with virus outbreaks in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Prolonged flu infections can have very serious health effects, including breathing difficulties and asthma.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the situation very seriously and cooperating with local authorities in their investigation.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear how the outbreak at the school occurred. Managment at {agency} have pointed the finger at poor hygiene practices outside the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} have accused the school of ignoring previous virus-related issues, exacerbating the problem.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have stated that they expect the situation to be properly dealt with before they return their children to the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
+
         if script == "illness (noro)":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Norovirus outbreak at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A norovirus outbreak has occurred at {agency}, causing health and safety concerns, according to information received by {self.papers[papernumber]}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school was shut down after the end of the semester, pending an investigation by the regional health services.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} state that they have suffered from severe food poisoning symptoms.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The norovirus outbreak at the school comes in the wake of recent issues with virus outbreaks in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Prolonged norovirus infections can have very serious health effects, including fever and digestion problems.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the situation very seriously and cooperating with local authorities in their investigation.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear how the outbreak at the school occurred. Management at {agency} have pointed the finger at poor hygiene practices outside the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} have accused the school of ignoring previous virus-related issues, exacerbating the problem.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have stated that they expect the situation to be properly dealt with before they return their children to the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))
+
         if script == "student injury (limb)":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Broken arm at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A student at {agency} has broken their arm during a recreational event organised by the school, school officials state.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The student was taken to a nearby hospital and is expected to make a full recovery.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} have told {self.papers[papernumber]} that they have had concerns over safety protocols at {agency}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The accident comes in the wake of recent issues with safety in recreational events in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Though the injury is minor, critics say that it is only a matter of time before a more serious injury occurs at the school if safety concerns are not addressed.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the situation very seriously and have hired an external expert to aid in updating their safety protocols.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear how the accident occurred. Teachers at {agency} have blamed management for overly ambitious recreational programs.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} also have accused the school of ignoring previous safety-related issues, exacerbating the problem.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have stated that they expect the situation to be properly dealt with before they return their children to the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
+
         if script == "student injury (concussion)":
-             pass
-        
-        if script == "staff injury (limb)":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Concussion at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A student at {agency} has sustained a concussion during a recreational event organised by the school, school officials state.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The student was taken to a nearby hospital and is expected to make a full recovery.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} have told {self.papers[papernumber]} that they have had concerns over safety protocols at {agency}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The accident comes in the wake of recent issues with safety in recreational events in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Though the injury is minor, critics say that it is only a matter of time before a more serious injury occurs at the school if safety concerns are not addressed.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the situation very seriously and have hired an external expert to aid in updating their safety protocols.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear how the accident occurred. Teachers at {agency} have blamed management for overly ambitious recreational programs.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} also have accused the school of ignoring previous safety-related issues, exacerbating the problem.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have stated that they expect the situation to be properly dealt with before they return their children to the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))       
+
         if script == "outbreak (lice)":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Lice outbreak at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A lice outbreak has occurred at {agency}, causing health and safety concerns, according to information received by {self.papers[papernumber]}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The school was shut down two weeks before the end of the semester, pending an investigation by the regional health services.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of students and staff at {agency} state that they have suffered lice infestations.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The lice outbreak at the school comes in the wake of recent issues with pest outbreaks in several schools and hospitals in the region.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Prolonged lice infestations can have serious health effects, including viral and bacterial infections.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at the school have stated that they are taking the situation very seriously and cooperating with local authorities in their investigation.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It is currently unclear how the outbreak at the school occurred. Management at {agency} have pointed the finger at poor hygiene practices outside the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Some teachers and students at {agency} have accused the school of ignoring previous pest-related issues, exacerbating the problem.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have stated that they expect the situation to be properly dealt with before they return their children to the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
+
         if script == "earthquake":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Earthquake at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"Disaster has struck at {agency} in the form of a highly destructive earthquake over the previous day.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"None were killed in the earthquake but several staff members were badly injured, in part due to the collapse of the school's roof.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The injured staff members have been taken to a nearly hospital and are expected to make a full recovery.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Luckily, no students were at the school during the earthquake due to the semester having ended just the previous day.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that the earthquake represents a freak accident and hope their staff members recover as soon as possible.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A representative from the teacher's union called the school's response to the earthquake inadequate and questioned safety protocals at {agency}.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed concern over the earthquake and stated that they are no longer confident that their children are safe at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The damage and medical expenses caused by the earthquake are expected to have to be paid frorm the school's budget.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"This is due to a controversial decision recently made by the Department of Education that schools need to cover their own emergency expenses.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))   
+
         if script == "equipment breakage":
-             pass
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Equipment breakage at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"Valuable equipment at {agency} have been smashed by an unknown vandal, according to school representatives. The vandalism has been reported to the police.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} state that they do not know who has perpetrated the vandalism, but have no reason to suspect anyone at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"No goods were stolen from the school, indicating the crime was purely an act of vandalism.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{agency} management have informed {self.papers[papernumber]} that they will need to replace the equipment from the school budget.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"This will place additional strain on the budget of the school. Teachers have expressed concern that this may limit the availability teaching equipment.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Students at the school have expressed concerns that their personal property may not be safe at the school if the perpetrator cannot be found.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"A number of parents at {agency}have also stated that they are concerned for the physical and emotional wellbeing of their child at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))  
 
         if script == "equipment donation":
-             pass
-        
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"Equipment donation to {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"A former alumni at {agency} has generously donated a valuable computer system to the school for the upcoming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donation is expected to free up school funding elsewhere and to provide students with state-of-the-art equipment to work with.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donor has told {self.papers[papernumber]} that they wanted to show their appreciation to the school which helped them start their academic journey.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donor prefers to stay anonymous, but teachers at the school have stated that they remember the donor well from their time at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that the generous donation illustrates the profound effect studying at the school can have even years later.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed their appreciation for the donor and their hope that their own children might enjoy a similarly positive experience at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Student representatives from {agency} say that they hope that new funding will be reflected in higher quality school meals for students.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The donation has already been processed and will be present at {agency} in the coming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))    
+
         if script == "external evaluation":
-             pass
+            title = []
+            lines = []
+            author = []
+            paper = []
+            name = script
+            text = self.arial3.render(f"{self.papers[papernumber]}", True, self.black)
+            paper.append((text, (x, y)))
+            y += 50
+            text = self.arial.render(f"State probe at {agency}", True, self.black)
+            title.append((text, (x, y)))
+            y += 50
+            text = self.arial2.render(f"The Department of Education hass announced that it will perform an unscheduled review of operations at {agency} in the next semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The announcement comes following public concerns over the state of instruction at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The department has told {self.papers[papernumber]} that they had received an anonymous complaint about the school which prompted their inquiry.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The Department declined to comment further on the exact form and nature of the complaint, but stated that it related in part to teaching practices.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Management at {agency} have stated that teaching at the school is in line with the guidelines set out by the Department of Education.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"The Department has recently shifted focus in their school guidelines and evaluations on science, mathematics and reading learning outcomes.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Parents at {agency} have expressed concern over the inquiry, but have not themselves complained to {self.papers[papernumber]} about the methods used at the school.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"Student representatives from {agency} say that they are unaware of any particular issues, but that there are always problems to address in teaching.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"It remains to be seen whether more attention is put into these issues at {agency} over the coming semester.", True, self.black)
+            lines.append((text, (x, y)))
+            y += 40
+            text = self.arial2.render(f"{self.authors[authornumber]}", True, self.black)
+            author.append((text, (x, y)))
+            for i in lines:
+                self.window.blit(i[0], (i[1][0], i[1][1]))
+            y += 40
+            self.news_archive[agency].append(((title, paper, lines, author), self.round_number, script))
+
+        return (title, paper, lines, author)
         
-        if script == "inter-school competition":
-             pass
-        
-        if script == "state grants":
-             pass
-        
-        if script == "fundraiser (bake sale)":
-             pass
-        
-        if script == "fundraiser (sporting event)":
-             pass
-        
-        if script == "fundraiser (auction)":
-             pass
-        
-        if script == "pro bono event":
-             pass
-        
-        if script == "outside event cancellation":
-             pass
+
 
     def create_agency_stats(self): #creates monitors for agency stats
         for i in self.agencies:
@@ -3273,7 +3838,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         if condition == "previous":
             text1 = self.arial.render("Click here to return to the menu page", True, self.black)
         if condition == "next":
-            text1 = self.arial.render("Click here to continue to the next page", True, self.black)
+            text1 = self.arial.render(f"Click here to continue to the next page", True, self.black)
         if condition == "roundend":
             text1 = self.arial.render("Click here to continue to school rankings", True, self.black)
         if condition == "rankings":
@@ -3336,7 +3901,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
             if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
                 self.roundchoice = "null"
                 self.add_to_output("rankings back button clicked")
-                self.roundend()
+                self.news_information = True
+                self.show_rankings = False
 
         if summary == 6: #historical rankings
             xy = pygame.mouse.get_pos()
@@ -3368,6 +3934,15 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.add_to_output("News reports back button clicked")
                 self.news_information = False
                 self.news_choice = True  
+
+        if summary == 9:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.roundchoice = "null"
+                self.add_to_output("news report back button clicked")
+                self.roundend()
 
     def show_agency_summary(self, roundnumber):
         rect1 = self.draw_exit("next")
@@ -3726,13 +4301,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
     def roundend(self):
-            self.insummary = False
-            self.agency = "null"
-            self.main_menu_action = False
-            self.show_agencies = True
-            self.show_feedback = True
-            self.show_main_menu = True
-            self.roundsummary2 = False
             self.roundtime = self.time
             self.increase_round_counter()
             self.baseconditions()
@@ -3981,7 +4549,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def news_summary(self, news):
         self.window.fill(self.white)
-        rect1 = self.draw_exit("previous")
+        if self.endrankings == False:
+            rect1 = self.draw_exit("previous")
+        if self.endrankings == True:
+            rect1 = self.draw_exit("rankings")
         title = news[0]
         paper = news[1]
         lines = news[2]
@@ -4000,10 +4571,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.increase_click_counter()
-                    self.summary_click_forward(8, rect1)
+                    if self.endrankings == False:
+                        self.summary_click_forward(8, rect1)
+                    if self.endrankings == True:
+                        self.summary_click_forward(9, rect1)
             if event.type == pygame.QUIT:
                 self.finish_game()
-
 
     def menu_option_6(self, menu_options): #show performance ranking
         self.window.fill(self.white)
@@ -4053,7 +4626,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         if self.endrankings == False:
             rect1 = self.draw_exit("previous")
         if self.endrankings == True:
-            rect1 = self.draw_exit("rankings")
+            rect1 = self.draw_exit("next")
         texts = []
         x = 150
         x1 = x-20
@@ -5036,9 +5609,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.video.play()
         self.vidintro = False
 
+
 game = BudgetGame()
+game.check_url()
 game.check_participant_number()
-game.create_identifier()
 game.create_agencies()
 game.create_game_board()
 game.create_budget_options()
@@ -5049,6 +5623,7 @@ game.base_scripts()
 game.create_scripts()
 game.create_agency_stats()
 game.check_score()
+game.create_identifier()
 game.create_ranking()
 game.post_output()
 game.create_historical_rankings()

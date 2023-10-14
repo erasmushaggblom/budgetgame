@@ -10,6 +10,7 @@ import uuid
 import js
 import os
 import io
+import webbrowser
 
 
 class RequestHandler:
@@ -158,6 +159,7 @@ class RequestHandler:
 class BudgetGame(): #create class for the game; class includes internal variables that are tracked throughout the game
     def __init__(self):
         pygame.init()
+        self.treatment = False
         self.satisfaction_standard_high = 90
         self.satisfaction_standard_low = 20
         self.performance_standard_high = 90
@@ -208,7 +210,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.main_menu_action = False #checks if main menu button has been clicked
         self.scripts = {} #dictionary containing the scripts chosen in a given round
         self.agency_status = {} #dictionary checking for input-based events
-        self.roundstandard = 2 #how many rounds are played
+        self.roundstandard = 1 #how many rounds are played
         self.round_number = 1 #tracks the number of rounds
         self.roundclicked = 2 #tracks the number of times the player has chosen to advance the round
         self.script_events = [0, 0] #list of events that have occurred in the current round
@@ -218,7 +220,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.reportchoice = []
         self.agency_scores = {} #score for each agency
         self.agency_round_results = {}
-        self.intro_style = "text" #choose "video" or "text"
+        self.intro_style = "text"
         self.start = True #condition for showing the instruction screen first
         self.agencynames = []
         self.endrankings = False
@@ -250,8 +252,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.roundsummary7 = False
         self.show_budget_options = False
         self.postgame = False
-        self.vidintro = True
-        self.show_vid = True
         self.show_rankings = False
         self.choice = "null"
         self.roundchoice = "null"
@@ -282,6 +282,16 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.authors = ["Tobias Deleu", "Michaël Mostinckx", "Stan Derycke", "Jean-Baptiste Van Den Houte", "Christopher De Neve", "Remco De Pauw", "Max Dermout", "Jasper Viaene", "Manuel Martens", "Ward De Gieter", "Ines Pelleriaux", "Saskia Baert", "Eline De Backer", "Carolien Renson", "Babette Tyberghein", "Kim Van Caemelbeke", "Helena Catteau", "Lise De Smedt", "Selin Van Pruisen", "Marine Dhondt", "Timothy Vermeulen", "Jesse Verhasselt", "Tristan Vercruysse", "Noé Libbrecht", "Davy Van Pruisen", "Maxime Vanderstraeten", "Cyril Van Vaerenbergh", "Baptiste Demuynck", "Bert Nys", "Jef Dermaut", "Isabelle Deleu", "Yasemin Fremaux", "Jill Arijs", "Marjorie Van Tieghem", "Imke Holvoet", "Alizée Deboeck", "Julia Pelleriaux", "Fauve Moerman", "Melisa Vrammout", "Sarah Six"]
         self.ranking_schools = ["School 1", "School 2", "School 3", "School 4", "School 5", "School 6", "School 7", "School 8", "School 9", "School 10", "School 11", "School 12", "School 13", "School 14", "School 15", "School 16", "School 17", "School 18", "School 19", "School 20"]
         self.possible_events = ["Talent show", "Sports fair", "Science fair", "Basketball game", "Football game", "Cook-off", "Bake sale", "Quiz", "School exchange", "Writing workshop", "Dance performance", "Musical performance", "Holiday celebration", "Independence party", "Museum visit", "Treasure hunt", "Charity run", "School party"] #names for possible events
+
+    def check_treatment_condition(self):
+        number = random.randrange(1,2)
+        if number == 1:
+            self.treatment = True
+
+    def treatment_condition(self):
+        if self.treatment == True:
+            self.show_rankings = True
+            self.start = False
 
     def baseconditions(self):
         if self.first_time == True:
@@ -318,7 +328,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.roundsummary7 = False
         self.show_budget_options = False
         self.postgame = False
-        self.show_vid = False
         self.main_menu_action = False
         self.first_time = False
         self.rankings = False
@@ -327,7 +336,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def check_url(self):
 
         self.arguments = sys.argv
-        print(self.arguments)
         
 
     def base_scripts(self): #scripts set to none
@@ -522,9 +530,13 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.finish_game()
 
     def finish_game(self):
+
         self.add_final_output()
         self.rename_output()
         game.post_output()
+        url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_7adyuWjd5qQYEV8" + f"?{self.id}"
+        print(url_open)
+        webbrowser.open(url_open)
         raise SystemExit
 
     def execute_script(self, script, agency): #executes a given script
@@ -774,7 +786,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
             my_file.write("\n")
 
     def create_identifier(self):
-        random_uuid = uuid.uuid1()
+        random_uuid = self.arguments[0]
         self.id = str(random_uuid)
         with open("output_file.txt", "a") as my_file:
             my_file.write(self.id)
@@ -3322,25 +3334,27 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def show_postgame(self): #draws a post-game screen
         x = 200
         y = 100
-        self.window.fill(self.cadetblue2)
+        boxheight = 50
+        boxwidth = 300
+        x2 = 305
+        y2 = 100
+        rounds = []
+        self.window.fill(self.white)
         text = self.arial.render("You have reached the end of the game, thank you for playing!", True, self.black)
         self.window.blit(text, (x, y))
         y += 30
         text = self.arial.render(f"Your score in the game was: {self.score_total[0]} out of 100", True, self.black)
         self.window.blit(text, (x, y))
         y += 30
-
-        text = self.arial.render("Insert additional debrief text here", True, self.black)
+        text = self.arial.render("Please click anywhere to open the exit survey and debrief!", True, self.black)
         self.window.blit(text, (x, y))
-        y += 30
-        text = self.arial.render("Click anywhere to exit", True, self.black)
-        self.window.blit(text, (x, y))
-        y += 30        
+        y += 30      
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.finish_game()
+
 
             if event.type == pygame.QUIT:
                 self.finish_game()
@@ -3835,6 +3849,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
         boxwidth = 400
         rect1 = (x, y, boxwidth, boxheight)
         pygame.draw.rect(self.window, self.tan, rect1)
+        if condition == "treatment":
+            text1 = self.arial.render("Click here to continue to the game", True, self.black)
         if condition == "previous":
             text1 = self.arial.render("Click here to return to the menu page", True, self.black)
         if condition == "next":
@@ -3943,6 +3959,18 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.roundchoice = "null"
                 self.add_to_output("news report back button clicked")
                 self.roundend()
+
+        if summary == 10:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("start rankings treatment continue button clicked")
+                self.show_rankings = False
+                self.start = True
+                self.treatment = False
+
+
 
     def show_agency_summary(self, roundnumber):
         rect1 = self.draw_exit("next")
@@ -4622,11 +4650,14 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
     def show_performance_rankings(self):
-        ranking = self.historical_rankings[self.roundchoice-1]
-        if self.endrankings == False:
+        if self.treatment == True:
+            rect1 = self.draw_exit("treatment")
+            self.roundchoice = 1
+        elif self.endrankings == False:
             rect1 = self.draw_exit("previous")
-        if self.endrankings == True:
+        elif self.endrankings == True:
             rect1 = self.draw_exit("next")
+        ranking = self.historical_rankings[self.roundchoice-1]
         texts = []
         x = 150
         x1 = x-20
@@ -4666,7 +4697,9 @@ class BudgetGame(): #create class for the game; class includes internal variable
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.increase_click_counter()
-                    if self.endrankings == True:
+                    if self.treatment == True:
+                        self.summary_click_forward(10, rect1)
+                    elif self.endrankings == True:
                         self.summary_click_forward(5, rect1)
                     else:
                         self.summary_click_forward(4, rect1)
@@ -5603,12 +5636,15 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def check_caption(self):
         pygame.display.set_caption(f"Welcome to the budget game!")
 
-    def instruction_video(self):
-        return
-        self.video = Video("vidmaker.mp4")
-        self.video.play()
-        self.vidintro = False
-
+    def check_treatment_condition(self):
+        number = random.randrange(1,2)
+        if number == 1:
+            self.treatment = True
+        self.treatment = True
+    def treatment_condition(self):
+        if self.treatment == True:
+            self.show_rankings = True
+            self.start = False
 
 game = BudgetGame()
 game.check_url()
@@ -5631,6 +5667,8 @@ game.historical_rankings.append(game.schoolranking)
 pygame.font.get_fonts()
 game.menu_options = game.create_game_menu() #creates the agency selection menu
 game.main_menus = game.create_main_menu()
+game.check_treatment_condition()
+game.treatment_condition()
 async def main():
     while True:
         game.check_caption()
@@ -5640,15 +5678,8 @@ async def main():
         game.window.fill(game.white) #fills the game screen with white
         if game.main_menu_action == False:
             game.draw_game_board()
-        if game.start == True and game.intro_style == "video" and game.vidintro == True:
-            game.instruction_video()
         if game.start == True and game.intro_style == "text":
             game.menu_option_1()
-        if game.show_vid == True and game.intro_style == "video":
-            try:
-                game.video.draw_to(game.window, (0, 0))
-            except TypeError:
-                game.baseconditions()
         if game.instruction_2 == True:
             game.instruction_screen_2()
         if game.show_effects == True:
@@ -5795,8 +5826,6 @@ async def main():
                         if game.choice == 0:
                             game.add_to_output("menu option 1 clicked")
                             game.start = True
-                            game.show_vid = True
-                            game.vidintro = True
                         if game.choice == 1:
                             game.add_to_output("menu option 2 clicked")
                             game.information = True

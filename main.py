@@ -163,19 +163,19 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.treatment = False #condition to select participants for treatment condition
         self.satisfaction_standard_high = 90 #standard to trigger high satisfaction event
         self.satisfaction_standard_low = 20 #standard to trigger low satisfaction event
-        self.satisfaction_standard_mid = 20 #standard to trigger low satisfaction event
+        self.satisfaction_standard_mid = 70 #standard to trigger mid satisfaction event
         self.performance_standard_high = 90 #standard to trigger high performance event
         self.performance_standard_low = 20 #standard to trigger low performance event
-        self.performance_standard_mid = 20 #standard to trigger low performance event
+        self.performance_standard_mid = 70 #standard to trigger mid performance event
         self.stress_standard_high = 90 #standard to trigger high stress event
         self.stress_standard_low = 20 #standard to trigger low stress event
-        self.stress_standard_mid = 20 #standard to trigger low stress event
+        self.stress_standard_mid = 40 #standard to trigger mid stress event
         self.learning_standard_high = 90 #standard to trigger high learning event
         self.learning_standard_low = 20 #standard to trigger low learning event
-        self.learning_standard_mid = 20 #standard to trigger low learning event
+        self.learning_standard_mid = 70 #standard to trigger mid learning event
         self.first_time = True #condition for starting the game for the first time
         self.agency_count = 0 #how many agencies are in the game
-        self.roundinterval = 0 #how long if the timer for round summaries in seconds
+        self.roundinterval = 3 #how long is the timer for round summaries in seconds
         self.summaryinterval = 10 #how long is the timer for eventg summaries in seconds (currently obsolete)
         self.roundtimer = 300 #how much time do players have in the game in seconds
         self.roundtime = 5 #time in a given round
@@ -191,8 +191,9 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.agency_stats = {} #monitors the budget, staff and functional equipment for each agency
         self.staff_stats = {} #monitors the staff happiness etc for each agency
         self.student_stats = {} #monitors the student satisfaction, learning outcomes etc for each agency
+        self.initial_budget = 15000 #starting budget
         self.budget_standard = 15000 #change in total budget per round
-        self.total_budget = self.budget_standard #initial budget set to 10000 euros
+        self.total_budget = self.initial_budget #total budget
         self.menu_buttons = [] #buttons for the agency menu
         self.budget_options = {} #budget action options
         self.agency_feedback = {} #player feedback in the agencies
@@ -227,7 +228,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.agency_scores = {} #score for each agency
         self.agency_round_results = {} #score for an agency at the end of a round
         self.intro_style = "text" #style of instructions used
-        self.start = True #condition for showing the instruction screen first
+        self.start = False #condition for showing the instruction screen first
         self.agencynames = [] #names of agencies in game
         self.endrankings = False #final agency ranking condition
         self.insummary = False #is the player in a summary screen
@@ -297,17 +298,27 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.year = 2023
         self.semester = 2
         self.gamerankings = []
+        self.introduction_1 = True
+        self.introduction_2 = False
+        self.introduction_3 = False
+        self.introduction_4 = False
+        self.introduction_5 = False
+        self.introduction_6 = False
+        self.introduction_7 = False
+        self.introduction_8 = False
+        self.introduction_9 = False
+        self.introduction_10 = False
 
     def check_treatment_condition(self): #assign the treatment condition
-
         number = random.randrange(1,3)
         if number == 1:
             self.treatment_information = True
-            self.start = False
+            self.introduction_1 = False
         if number == 2:
             self.treatment_information = False
 
     def baseconditions(self): #set conditions to return the game to base state
+        self.main_menus = self.create_main_menu("base")
         if self.first_time == True:
             self.roundtime = self.time
         self.agency = "null"
@@ -349,6 +360,16 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.budget_question = False
         self.officer_report = False
         self.timer_follow = True
+        self.introduction_1 = False
+        self.introduction_2 = False
+        self.introduction_3 = False
+        self.introduction_4 = False
+        self.introduction_5 = False
+        self.introduction_6 = False
+        self.introduction_7 = False
+        self.introduction_8 = False
+        self.introduction_9 = False
+        self.introduction_10 = False
 
 
     def check_url(self): #check the url arguments
@@ -413,6 +434,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
         
     def advance_game_round(self): #advances to the next round of the game
+        self.increase_click_counter()
+        self.add_to_output(f"progression to next round")
         self.semester += 1
         if self.semester == 3:
             self.semester = 1
@@ -445,9 +468,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.student_stats[i[0]][3] = self.student_stats[i[0]][9]
                 self.student_stats[i[0]][4] = self.student_stats[i[0]][10]
                 self.student_stats[i[0]][5] = self.student_stats[i[0]][11]
+            self.total_budget = self.budget_standard
             self.adjust_total_budget(self.budget_standard)
-            for i in self.agencies:
-                self.adjust_agency_budget(i[0], 1000)
             self.adjust_ranking()
             self.historical_rankings.append(self.schoolranking)
             self.gamerankings.append(self.schoolranking)
@@ -455,8 +477,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def check_score(self): #checks the current player score
         list1 = []
-        numbers = []
         for i in self.student_stats:
+            numbers = []
             numbers.append(self.student_stats[i][6])
             numbers.append(self.student_stats[i][7])
             numbers.append(self.student_stats[i][8])
@@ -869,15 +891,14 @@ class BudgetGame(): #create class for the game; class includes internal variable
             count += 1
         self.budget_options[agency] = []
         self.agency_feedback[agency] = []
-        self.adjust_total_budget(-initial_budget) #when adding a new agency, the initial budget is subtracted form the total budget
         self.agency_count += 1
         self.agencynames.append(agency)
 
     def create_agencies(self): #creates the agencies to be used; the name can be edited to change the labels in the game. With longer names the label code may need to be adjusted. The current form of the code supports up to four different agencies; more can be added if required but this would require more significant changes to the source code
         self.add_agency("Blad Hoog", 1000, 0, 1000, 0, "null", "null", "null", "null")
-        self.add_agency("Robin Hoog", -2000, 5, 200, 1, "null", "null", "null", "null")
-        self.add_agency("Vallei Primair", -4000, 10, -300, 2, "null", "null", "null", "null")
-        self.add_agency("Zee Primair", 6000, -5, 400, 3, "null", "null", "null", "null")
+        self.add_agency("Robin Hoog", -2500, 5, 200, 1, "null", "null", "null", "null")
+        self.add_agency("Vallei Primair", -1500, 10, -300, 2, "null", "null", "null", "null")
+        self.add_agency("Zee Primair", 3000, -5, 400, 3, "null", "null", "null", "null")
         for i in self.agencies:
             self.agency_events[i[0]] = []
             self.news_archive[i[0]] = []
@@ -3128,6 +3149,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def adjust_agency_budget(self, agency, amount: float): #adjusts budget for a given agency
         self.agency_stats[agency][0] += amount
+        if self.agency_stats[agency][0] < -8000:
+            self.agency_stats[agency][0] = -8000
 
     def adjust_agency_staff(self, agency: tuple, amount: int): #changes the umber of staff in a given agency
         for i in self.agency_stats:
@@ -3351,23 +3374,24 @@ class BudgetGame(): #create class for the game; class includes internal variable
         y = 575
         boxwidth = 100
         boxheight = 100
-        rect1 = (x, y, boxwidth, boxheight)
-        pygame.draw.rect(self.window, self.gold, rect1)
-        text1 = self.arial.render(f"Klik op een", True, self.black)
-        self.window.blit(text1, (x+5, y+10))
-        y += 25
-        text1 = self.arial.render(f"school om", True, self.black)
-        self.window.blit(text1, (x+5, y+10))
-        y += 25
-        text1 = self.arial.render(f"te selecteren!", True, self.black)
-        self.window.blit(text1, (x+5, y+10))
+        if self.first_time == False:
+            rect1 = (x, y, boxwidth, boxheight)
+            pygame.draw.rect(self.window, self.gainsboro, rect1)
+            text1 = self.arial.render(f"Klik op een", True, self.black)
+            self.window.blit(text1, (x+5, y+10))
+            y += 25
+            text1 = self.arial.render(f"school om", True, self.black)
+            self.window.blit(text1, (x+5, y+10))
+            y += 25
+            text1 = self.arial.render(f"te selecteren!", True, self.black)
+            self.window.blit(text1, (x+5, y+10))
 
 
     def menu_option_1(self): #draws the initial instruction screen for the player
         self.window.fill(self.white)
         x = 25
         y = 75
-        text = self.arial.render(f"Dit is het budget spel. In dit spel word je gevraagd om op te treden als een beleidsmaker die beslist over het budget van openbare scholen.", True, self.black)
+        text = self.arial.render(f"Dit is het budget spel. In dit spel word je gevraagd om op te treden als een beleidsmaker die beslist over schoolbudgetten.", True, self.black)
         self.window.blit(text, (x, y))
         y += 25
         text = self.arial.render(f"Er zijn {len(self.agencies)} verschillende scholen waarvoor je verantwoordelijk bent over een periode van {self.roundstandard} semesters.", True, self.black)
@@ -3379,7 +3403,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         text = self.arial.render(f"Het belangrijkste doel van het spel is om de leerresultaten van de leerlingen te maximaliseren terwijl je binnen je totale budget blijft.", True, self.black)
         self.window.blit(text, (x, y))
         y += 25
-        text = self.arial.render(f"Er zijn drie leerresultaten die onafhankelijk van elkaar worden bijgehouden: de scores van de leerlingen voor wiskunde, lezen en natuurwetenschap.", True, self.black)
+        text = self.arial.render(f"Er zijn drie leerresultaten die worden bijgehouden: de scores van de leerlingen voor wiskunde, lezen en natuurwetenschap.", True, self.black)
         self.window.blit(text, (x, y))
         y += 25
         text = self.arial.render(f"Elke school heeft een index die de status bijhoudt. Er is ook een algemene leerresultatenindex die je een score geeft.", True, self.black)
@@ -3496,6 +3520,286 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.add_to_output("instruction screen back button clicked")
                         self.baseconditions()
 
+            if event.type == pygame.QUIT:
+                self.finish_game()
+            
+    def intro_1(self):
+        self.window.fill(self.white)
+        self.draw_game_board()
+        self.draw_agency_menu(self.menu_options)
+        x = 150
+        y = 200
+        text = self.arial.render(f"Dit is het budget spel. In dit spel word je gevraagd om op te treden als een beleidsmaker die beslist over schoolbudgetten.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Er zijn {len(self.agencies)} verschillende scholen waarvoor je verantwoordelijk bent over een periode van {self.roundstandard} semesters.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(13, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_2(self):
+        self.window.fill(self.white)
+        menu = self.create_main_menu("video")
+        self.draw_main_menu(menu)
+        x = 150
+        y = 200
+        text = self.arial.render(f"Elke school heeft maatregelen die de prestaties, het geluk en het stressniveau van hun personeel en leerlingen bijhouden.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Het belangrijkste doel van het spel is om de leerresultaten van de leerlingen te maximaliseren terwijl je binnen je totale budget blijft.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Het secundaire doel van het spel is om voldoende geluk onder het personeel en de studenten te behouden.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(14, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_3(self):
+        self.window.fill(self.white)
+        x = 150
+        y = 200
+        self.draw_game_board()
+        self.draw_agency_menu(self.menu_options)
+        for i in self.feedback:
+            self.draw_feedback(i, ("cornsilk"))
+        text = self.arial.render(f"Er zijn drie leerresultaten die worden bijgehouden: de scores van de leerlingen voor wiskunde, lezen en natuurwetenschap.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Elke school heeft een index die de status bijhoudt. Er is ook een algemene leerresultatenindex die je een score geeft.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(15, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_4(self):
+        self.agency = "Blad Hoog"
+        self.window.fill(self.white)
+        self.budget_menu = []
+        self.budgeting_labels1 = []
+        self.budgeting_labels2 = []
+        self.budget_buttons = []
+        self.budget_menu = self.create_budgeting_menu(self.agency, "video")
+        self.draw_budget_options(self.budget_menu)        
+        x = 100
+        y = 200
+
+        text = self.arial.render(f"Als budgetbeheerder ben je verantwoordelijk voor een aantal maatregelen waarmee je geld kunt besparen of de resultaten kunt verbeteren.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 50
+        text = self.arial.render(f"Het aannemen van nieuw personeel zal personeel gelukkiger maken en beter laten presteren.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Het ontslaan van personeel zal het tegenovergestelde effect hebben.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"De aankoop van apparatuur zal de prestaties en de tevredenheid van het personeel verbeteren, recycling zal het tegenovergestelde doen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Het organiseren van evenementen zal het geluk van studenten verhogen en de stress onder studenten verminderen,", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"maar de stress onder het personeel zal toenemen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Vragen om een externe sonde zal de prestaties verbeteren maar de stress verhogen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 75
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(16, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_5(self):
+        self.window.fill(self.white)
+        self.agency = "null"
+        self.draw_game_board()
+        self.draw_agency_menu(self.menu_options)
+        for i in self.feedback:
+            self.draw_feedback(i, ("cornsilk"))
+        x = 150
+        y = 200
+        text = self.arial.render(f"Scholen zijn door het schoolbestuur verplicht om voldoende personeel, apparatuur en evenementen te hebben.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Het geluks-, stress- en prestatieniveau van de studenten zullen elkaar allemaal beïnvloeden:", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 50
+        text = self.arial.render(f"Positieve leerresultaten zorgen ervoor dat personeel en leerlingen gelukkiger en minder gestrest zijn.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Negatieve leerresultaten zullen het tegenovergestelde effect hebben en ertoe leiden dat sommige medewerkers hun baan opzeggen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Als je niet binnen het budget van de school blijft, raakt het personeel meer gestrest en daalt het prestatieniveau.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Lage algemeen prestaties zullen de stress verhogen en de leerresultaten verlagen, hoge prestaties zullen het tegenovergestelde doen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Als er geen evenementen worden georganiseerd, zullen studenten ongelukkig worden en slechter presteren.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Als de school onderbezet is, zullen leerlingen en personeel slechter presteren en ongelukkig zijn; meer personeel zal vertrekken.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 50
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(17, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_6(self):
+        self.window.fill(self.white)
+        x = 50
+        y = 200
+        text = self.arial.render(f"Er zijn ook een aantal willekeurige gebeurtenissen die op elke school kunnen voorkomen. Deze kunnen zowel negatieve als positieve effecten hebben.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"De evenementen variëren van natuurrampen tot alumni-evenementen. Ze worden automatisch gegenereerd aan het einde van elk semester.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Je zult in staat zijn om budgetbeslissingen te nemen voor elke school afzonderlijk. Als je tevreden bent, kun je doorgaan naar het volgende semester.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Je hebt maximaal {int(self.roundtimer/60)} minuten per semester, daarna gaat het spel automatisch door naar het volgende semester.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(18, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_7(self):
+        self.window.fill(self.white)
+        x = 50
+        y = 200
+        text = self.arial.render(f"Tussen de semesters vinden spelevenementen plaats en worden algemene en schoolbudgetten aangepast.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Je kunt op elk moment vanuit het hoofdmenuscherm hiernaar terugkeren om de spelinstructies te lezen.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 25
+        text = self.arial.render(f"Je hebt ook de optie om meer in detail te kijken naar de effecten die elke budgetkeuze heeft.", True, self.black)
+        self.window.blit(text, (x, y))
+        y += 75
+        text = self.arial.render(f"Veel plezier met het spel!", True, self.black)
+        self.window.blit(text, (x, y))
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(19, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_8(self):
+        self.window.fill(self.white)
+        x = 150
+        y = 200
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(20, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_9(self):
+        self.window.fill(self.white)
+        x = 150
+        y = 200
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(21, rect1)
+            if event.type == pygame.QUIT:
+                self.finish_game()
+
+    def intro_10(self):
+        self.window.fill(self.white)
+        x = 150
+        y = 200
+        rect1 = self.draw_exit("next_intro")
+
+        for event in pygame.event.get():
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.increase_click_counter()
+                    xy = pygame.mouse.get_pos()
+                    x = xy[0]
+                    y = xy[1]
+                    self.summary_click_forward(22, rect1)
             if event.type == pygame.QUIT:
                 self.finish_game()
 
@@ -4066,14 +4370,15 @@ class BudgetGame(): #create class for the game; class includes internal variable
         x = 340
         y = 5
         boxheight = 30
-        boxwidth = 450
-        rect1 = (x, y, boxwidth, boxheight)
-        pygame.draw.rect(self.window, self.tan, rect1)
+        boxwidth = 400
         if condition == "treatment":
             text1 = self.arial.render("Klik hier om door te gaan naar het spel", True, self.black)
         if condition == "previous":
             text1 = self.arial.render("Klik hier om terug te gaan naar de menupagina", True, self.black)
         if condition == "next":
+            text1 = self.arial.render(f"Klik hier om door te gaan naar de volgende pagina", True, self.black)
+        if condition == "next_intro":
+            y = 130
             text1 = self.arial.render(f"Klik hier om door te gaan naar de volgende pagina", True, self.black)
         if condition == "roundend":
             text1 = self.arial.render("Klik hier om door te gaan naar de ranglijst van scholen", True, self.black)
@@ -4084,10 +4389,11 @@ class BudgetGame(): #create class for the game; class includes internal variable
         if condition == "start":
             text1 = self.arial.render("Klik hier om door te gaan naar het spel!", True, self.black)
         if condition == "treatment_start":
-            text1 = self.arial.render("Klik hier om door te gaan naar het prestatieklassement!", True, self.black)
+            text1 = self.arial.render("Klik hier om door te gaan naar het prestatierankings!", True, self.black)
         if condition == "officer":
             text1 = self.arial.render("Klik hier om door te gaan naar de samenvatting van de ronde", True, self.black)
-
+        rect1 = (x, y, boxwidth, boxheight)
+        pygame.draw.rect(self.window, self.tan, rect1)
         self.window.blit(text1, (x+10, y+3))
         return rect1
 
@@ -4192,7 +4498,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
             if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
                 self.add_to_output("start rankings treatment continue button clicked")
                 self.show_rankings = False
-                self.start = True
+                self.introduction_1 = True
                 self.treatment = False
 
         if summary == 11:
@@ -4215,6 +4521,94 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.roundsummary1 = True
                 self.insummary = True
                 self.intervaltime = game.time
+
+        if summary == 13:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_1 = False
+                self.introduction_2 = True
+
+        if summary == 14:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_2 = False
+                self.introduction_3 = True
+
+        if summary == 15:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_3 = False
+                self.introduction_4 = True
+
+        if summary == 16:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_4 = False
+                self.introduction_5 = True
+
+        if summary == 17:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_5 = False
+                self.introduction_6 = True
+
+        if summary == 18:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_6 = False
+                self.introduction_7 = True
+
+        if summary == 19:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.baseconditions()
+
+        if summary == 20:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_8 = False
+                self.introduction_9 = True
+
+        if summary == 21:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.introduction_9 = False
+                self.introduction_10 = True
+
+        if summary == 22:
+            xy = pygame.mouse.get_pos()
+            x = xy[0]
+            y = xy[1]
+            if self.click_box(x, y, rect1) == True: #checks if a budget option has been clicked
+                self.add_to_output("Introduction forward button clicked")
+                self.baseconditions()
 
     def show_agency_summary(self, roundnumber): #show the summary of events at an agency
         rect1 = self.draw_exit("next")
@@ -5201,7 +5595,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.main_menu_options.append(("Bekijk schoolranglijsten", 5))
 
 
-    def create_main_menu(self): #creates the main menu based on the selected menu options
+    def create_main_menu(self, condition): #creates the main menu based on the selected menu options
         self.main_menu_buttons = []
         self.create_main_menu_options()
         menu_options = []
@@ -5212,16 +5606,19 @@ class BudgetGame(): #create class for the game; class includes internal variable
         boxwidth2 = 425
         boxheight2 = 300
         count = 0
-        for i in self.main_menu_options:
-            menu_options.append((x, y, boxwidth, boxheight))
-            text = i[0]
-            self.main_menu_labels.append((text, x+5, y+5))
-            self.main_menu_buttons.append(((x, y, boxwidth, boxheight), count))
-            x += boxwidth + 25
-            if x + boxwidth > 1080:
-                x = 160
-                y += boxheight + 25
-            count += 1
+        if condition == "base":
+            for i in self.main_menu_options:
+                menu_options.append((x, y, boxwidth, boxheight))
+                text = i[0]
+                self.main_menu_labels.append((text, x+5, y+5))
+                self.main_menu_buttons.append(((x, y, boxwidth, boxheight), count))
+                x += boxwidth + 25
+                if x + boxwidth > 1080:
+                    x = 160
+                    y += boxheight + 25
+                count += 1
+        if condition == "video":
+            y += 2*(boxheight + 25)
         menu_options.append((x, y, boxwidth2, boxheight2))
         x += boxwidth2 + 50
         menu_options.append((x, y, boxwidth2, boxheight2))
@@ -5841,6 +6238,38 @@ class BudgetGame(): #create class for the game; class includes internal variable
             text = "Afsluiten naar hoofdmenu"
             self.budgeting_labels1.append((text, x2+5, y2+5, boxwidth, boxheight))
             self.budget_buttons.append(((x2, y2, boxwidth, boxheight), "exit", "null"))
+
+        if condition == "video":
+            menu_options = []
+            x = 100
+            y = 450
+            boxheight = 60
+            boxwidth = 260
+            x2 = x + boxwidth + 50
+
+            for i in self.budget_options[agency]:
+
+                if i[1] < 0:
+                    menu_options.append(((x, y, boxwidth, boxheight), self.cornflowerblue))
+                else:
+                    menu_options.append(((x, y, boxwidth, boxheight), self.tomato))
+                text = (i[0])
+                self.budgeting_labels1.append((text, x+5, y+5))
+                cost = i[1]
+                if cost > 0:
+                    action_cost_label = f"Kosten: {cost} €"
+                else:
+                    action_cost_label = f"Geld bespaard: {-cost} €"
+                if text == "de financiering verhogen":
+                    action_cost_label = f"Kosten: {cost} €"
+                if text == "vermindering van financiering":
+                    action_cost_label = f"Geld bespaard: {-cost} €"
+                self.budgeting_labels1.append((action_cost_label, x+5, y+30))
+                self.budget_buttons.append(((x, y, boxwidth, boxheight), text, cost))
+                x += boxwidth + 50
+                if x + boxwidth > 1080:
+                    x = 100
+                    y += boxheight + 25
         return menu_options
 
     def click_circle(self, x: int, y: int, circle: tuple): #checks if a click by the player is in a circle
@@ -5896,8 +6325,8 @@ game.post_output()
 game.create_historical_rankings()
 game.historical_rankings.append(game.schoolranking)
 game.menu_options = game.create_game_menu() #creates the agency selection menu
-game.main_menus = game.create_main_menu()
 game.check_treatment_condition()
+game.feedback = game.update_game_feedback()
 async def main(): #main game loop
     while True:
         game.check_caption()
@@ -5977,6 +6406,26 @@ async def main(): #main game loop
             game.performance_ranking_instructions()
         if game.budget_question == True:
             game.show_budget_warning()
+        if game.introduction_1 == True:
+            game.intro_1()
+        if game.introduction_2 == True:
+            game.intro_2()
+        if game.introduction_3 == True:
+            game.intro_3()
+        if game.introduction_4 == True:
+            game.intro_4()
+        if game.introduction_5 == True:
+            game.intro_5()
+        if game.introduction_6 == True:
+            game.intro_6()
+        if game.introduction_7 == True:
+            game.intro_7()
+        if game.introduction_8 == True:
+            game.intro_8()
+        if game.introduction_9 == True:
+            game.intro_9()
+        if game.introduction_10 == True:
+            game.intro_10()
 
         if game.show_feedback == True:
             for i in feedback:

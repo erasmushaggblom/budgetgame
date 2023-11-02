@@ -11,6 +11,7 @@ import js
 import os
 import io
 import webbrowser
+import datetime
 
 
 class RequestHandler:
@@ -177,7 +178,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.agency_count = 0 #how many agencies are in the game
         self.roundinterval = 3 #how long is the timer for round summaries in seconds
         self.summaryinterval = 10 #how long is the timer for eventg summaries in seconds (currently obsolete)
-        self.roundtimer = 300 #how much time do players have in the game in seconds
+        self.roundtimer = 300 #how much time do players have in the game in seconds per round
         self.roundtime = 5 #time in a given round
         self.clock = pygame.time.Clock() #function to advance time
         self.time = 0 #total time in the game
@@ -288,7 +289,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.historical_rankings = [] #list of historical rankings
         self.papers = ["Onafhankelijke Tribune", "Metropolitaans Record", "Levenstijden", "De Explorer Telegram", "De Telegraaf Times", "Zaterdag Tribune", "Eenheid Dagelijks", "Gazette Avond", "Dagelijkse beschermheer", "Dagelijks Thuis", "Ochtendnieuws", "De Primeur Onderzoeker", "De Lokale Krant", "Wereldtijden", "Zenith Nieuws", "Het Eerste Lichtbericht", "Koerier Dagelijks", "Verhalend Weekblad", "Wekelijkse Sentinel", "Dagelijkse Lodestar", "De Prime Kronieken", "De Observer", "Tijd van het Leven", "Vandaag Nieuws", "De Eerste Licht Kroniek" , "De Erfgoedkronieken", "Alliance dagelijks", "Verhalende Avond", "Dagelijks baken", "Wekelijkse Estafette", "De Era Kroniek", "Het Eerste Licht Bulletin", "De Dispatch Kronieken", "Samenleving Nieuws", "De Levenskronieken", "Insider Times", "Observer Avond", "Dagelijks baken", "Ochtend Observer", "Dagelijks Nationaal"] #list of newspapers
         self.authors = ["Tobias Deleu", "Michaël Mostinckx", "Stan Derycke", "Jean-Baptiste Van Den Houte", "Christopher De Neve", "Remco De Pauw", "Max Dermout", "Jasper Viaene", "Manuel Martens", "Ward De Gieter", "Ines Pelleriaux", "Saskia Baert", "Eline De Backer", "Carolien Renson", "Babette Tyberghein", "Kim Van Caemelbeke", "Helena Catteau", "Lise De Smedt", "Selin Van Pruisen", "Marine Dhondt", "Timothy Vermeulen", "Jesse Verhasselt", "Tristan Vercruysse", "Noé Libbrecht", "Davy Van Pruisen", "Maxime Vanderstraeten", "Cyril Van Vaerenbergh", "Baptiste Demuynck", "Bert Nys", "Jef Dermaut", "Isabelle Deleu", "Yasemin Fremaux", "Jill Arijs", "Marjorie Van Tieghem", "Imke Holvoet", "Alizée Deboeck", "Julia Pelleriaux", "Fauve Moerman", "Melisa Vrammout", "Sarah Six"] #list of authors
-        self.ranking_schools = ["Trinity", "Adelaarsberg", "Lang Strand", "Koraal Bronnen", "Dennenheuvel", "Zonnige Heuvels", "Regenboog", "Helder Meer", "Esdoorn", "Kleine Rots", "Fortuna", "Eiken Park", "Stonewall", "Bosmeer", "Zonnige kust", "Appelvallei", "Zegel Hoog", "Rode Landen", "Erfgoed", "Hertenrivier"] #list of schools for comparison
+        self.ranking_schools = ["Trinity", "Adelaarsberg", "Lang Strand", "Koraal Bronnen", "Dennenheuvel", "Zonnige Heuvels", "Regenboog", "Helder Meer", "Esdoorn", "Kleine Rots", "Fortuna", "Eiken Park", "Stonewall", "Bosmeer", "Zonnige Kust", "Appelvallei", "Zegel Hoog", "Rode Landen", "Erfgoed", "Hertenrivier"] #list of schools for comparison
         self.possible_events = ["Talentenjacht", "Sportbeurs", "Wetenschapsbeurs", "Basketbalwedstrijd", "Voetbalwedstrijd", "Cook-off", "Bakselverkoop", "Vragenspel", "Schooluitwisseling", "Workshop schrijven", "Dansvoorstelling", "Muzikale voorstelling", "Vakantiefeest", "Onafhankelijkheidsfeest", "Museumbezoek", "Schattenjacht", "Liefdadigheidsloop", "Schoolfeest"] #names for possible events
         self.report_budget = "null"
         self.budget_question = False
@@ -298,6 +299,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.year = 2023
         self.semester = 2
         self.gamerankings = []
+        self.timer_follow = True
         self.introduction_1 = True
         self.introduction_2 = False
         self.introduction_3 = False
@@ -310,12 +312,15 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.introduction_10 = False
 
     def check_treatment_condition(self): #assign the treatment condition
+
         number = random.randrange(1,3)
         if number == 1:
             self.treatment_information = True
             self.introduction_1 = False
         if number == 2:
             self.treatment_information = False
+        self.output += f"treatment condition: {str(self.treatment_information)}"
+        self.output += "\n"
 
     def baseconditions(self): #set conditions to return the game to base state
         self.main_menus = self.create_main_menu("base")
@@ -359,7 +364,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.show_rankings = False
         self.budget_question = False
         self.officer_report = False
-        self.timer_follow = True
         self.introduction_1 = False
         self.introduction_2 = False
         self.introduction_3 = False
@@ -409,6 +413,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     news_report = self.create_semester_scripts(agency, u)
                     self.reportchoice.append(news_report)
         self.script_events[1] = list1
+        self.output += f"random events: {str(list1)}"
+        self.output += "\n"
 
     def run_input_scripts(self): #runs input scripts based on given conditions
         list1 = []
@@ -431,11 +437,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                                     self.reportchoice.append(news_report)
 
         self.script_events[0] = list1
+        self.output += f"input events: {str(list1)}"
+        self.output += "\n"
 
         
     def advance_game_round(self): #advances to the next round of the game
         self.increase_click_counter()
-        self.add_to_output(f"progression to next round")
         self.semester += 1
         if self.semester == 3:
             self.semester = 1
@@ -448,6 +455,26 @@ class BudgetGame(): #create class for the game; class includes internal variable
             self.met_budget = True
             self.report_budget = self.create_semester_scripts("agency", "budget officer within budget") 
             self.budget_record.append(True)
+        self.output += "round progression"
+        self.output += "\n"
+        self.output += f"current round: {str(self.round_number)}"
+        self.output += "\n"
+        self.output += "game state: "
+        self.output += "\n"
+        self.output += f"agency scores: {str(self.agency_scores)}"
+        self.output += "\n"
+        self.output += f"player score: {str(self.score)}"
+        self.output += "\n"
+        self.output += f"agency stats: {str(self.agency_stats)}"
+        self.output += "\n"
+        self.output += f"staff stats: {str(self.staff_stats)}"
+        self.output += "\n"
+        self.output += f"student stats: {str(self.student_stats)}"
+        self.output += "\n"
+        self.output += f"total budget: {str(self.total_budget)}"
+        self.output += "\n"
+        self.output += f"current ranking: {str(self.schoolranking)}"
+        self.output += "\n"
         self.post_output()
         if self.roundclicked > self.round_number:
             self.reportchoice = []
@@ -835,40 +862,40 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def create_identifier(self): #create unique identifier
         random_uuid = self.arguments[0]
         self.id = str(random_uuid)
+        self.output += "identifier: "
         self.output += self.id
         self.output += "\n"
 
     def post_output(self): #send post request to API with game results
+        ct = datetime.datetime.now()
+        time_now = str(ct)
         string1 = ""
         identity = self.id
 
         self.output += f"game time: {self.time}"
         self.output += "\n"
 
+
         string1 = self.output
 
-        post_dict = {identity: string1}       
+        post_dict = {"identity": identity,
+                     "timestamp": time_now,
+                     "data": string1}       
         output = RequestHandler()
         # Define the URL and data for the POST request
-        url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
+        url = "https://httpbin.org/post"
         data = post_dict
         # Send the POST request
-        asyncio.run(output.post(url, data))
+        try:
+            asyncio.run(output.post(url, data))
+        except:
+            pass
+            
 
 
     def add_to_output(self, add: str): #records player inputs in the output file
         if self.click_counter > self.output_tracker:
             self.output_tracker += 1
-            self.output += "game state: "
-            self.output += "\n"
-            self.output += f"agency stats: {str(self.agency_stats)}"
-            self.output += "\n"
-            self.output += f"staff stats: {str(self.staff_stats)}"
-            self.output += "\n"
-            self.output += f"student stats: {str(self.student_stats)}"
-            self.output += "\n"
-            self.output += f"total budget: {str(self.total_budget)}"
-            self.output += "\n"
             self.output += add
             self.output += "\n"
 
@@ -3877,9 +3904,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.increase_click_counter()
                 self.add_to_output(f"finish game button clicked")
-                if event.button == 1:
-
-                    self.finish_game()
+                self.finish_game()
 
 
             if event.type == pygame.QUIT:
@@ -4370,7 +4395,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         x = 340
         y = 5
         boxheight = 30
-        boxwidth = 400
+        boxwidth = 500
         if condition == "treatment":
             text1 = self.arial.render("Klik hier om door te gaan naar het spel", True, self.black)
         if condition == "previous":
@@ -4490,6 +4515,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.roundchoice = "null"
                 self.add_to_output("news report back button clicked")
                 self.roundend()
+
 
         if summary == 10:
             xy = pygame.mouse.get_pos()
@@ -4986,13 +5012,13 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
+                    self.increase_click_counter()
                     xy = pygame.mouse.get_pos()
                     x = xy[0]
                     y = xy[1]
                     if self.click_box(x, y, rect1) == True:
                             self.endrankings = True
                             self.roundover = False
-                            self.increase_click_counter()
                             self.add_to_output("Semester summary forward button clicked")
                             self.roundchoice = self.round_number
                             self.show_rankings = True
@@ -5000,24 +5026,37 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
 
     def roundend(self): #end the round
-            self.roundtime = self.time
-            self.increase_round_counter()
-            self.baseconditions()
-            if self.round_number == self.roundstandard + 1:
-                self.postgame = True
-                self.add_final_output()
-                self.start = False #condition for showing the instruction screen first
-                self.instruction_2 = False
-                self.information = False
-                self.summary = False
-                self.agency_summary = False
-                self.agency_summary_2 = False
-                self.show_agencies = False
-                self.show_effects = False
-                self.show_event_effects = False
-                self.show_main_menu = False
-                self.show_feedback = False
-                self.show_budget_options = False
+        self.timer_follow = True
+        self.roundtime = self.time
+        self.increase_round_counter()
+        self.baseconditions()
+        self.output += "game state: "
+        self.output += "\n"
+        self.output += f"agency stats: {str(self.agency_stats)}"
+        self.output += "\n"
+        self.output += f"staff stats: {str(self.staff_stats)}"
+        self.output += "\n"
+        self.output += f"student stats: {str(self.student_stats)}"
+        self.output += "\n"
+        self.output += f"total budget: {str(self.total_budget)}"
+        self.output += "\n"
+        self.output += f"current ranking: {str(self.schoolranking)}"
+        self.output += "\n"
+        if self.round_number == self.roundstandard + 1:
+            self.postgame = True
+            self.add_final_output()
+            self.start = False #condition for showing the instruction screen first
+            self.instruction_2 = False
+            self.information = False
+            self.summary = False
+            self.agency_summary = False
+            self.agency_summary_2 = False
+            self.show_agencies = False
+            self.show_effects = False
+            self.show_event_effects = False
+            self.show_main_menu = False
+            self.show_feedback = False
+            self.show_budget_options = False
 
     def menu_option_5(self, menu_options): #view historical performance
         self.window.fill(self.white)
@@ -5211,8 +5250,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.finish_game()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
-                self.increase_click_counter()
                 if event.button == 1:
+                    self.increase_click_counter()
                     self.summary_click_forward(6, rect1)
 
 
@@ -5297,7 +5336,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.summary_click_forward(8, rect1)
                     elif self.endrankings == True:
                         self.summary_click_forward(9, rect1)
-                        self.timer_follow = True
             if event.type == pygame.QUIT:
                 self.finish_game()
 
@@ -6442,7 +6480,6 @@ async def main(): #main game loop
                 game.choice = 2
                 game.advance_game_round()
                 game.officer_report = True
-
     
                 
 

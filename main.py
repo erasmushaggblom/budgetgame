@@ -915,7 +915,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
                      "data": string1}
         output = RequestHandler()
         # Define the URL and data for the POST request
-        url = "https://httpbin.org/"
+        url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
         data = post_dict
         # Send the POST request
         try:

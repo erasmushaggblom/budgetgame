@@ -12,6 +12,8 @@ import os
 import io
 import webbrowser
 import datetime
+import uuid
+
 
 
 class RequestHandler:
@@ -609,10 +611,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 self.finish_game()
 
     def finish_game(self): #finish the game and redirect the player to exit survey
-
         self.add_final_output()
         self.post_output()
-        url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_7adyuWjd5qQYEV8" + f"?{self.id}"
+        if self.redirect != "noredirect":
+            url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_7adyuWjd5qQYEV8" + f"?id1={self.id_participant}&id2={self.id_survey}&id3={self.id_game}"
         webbrowser.open(url_open)
         raise SystemExit
 
@@ -860,30 +862,60 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.output += "\n"
 
     def create_identifier(self): #create unique identifier
-        random_uuid = self.arguments[0]
-        self.id = str(random_uuid)
-        self.output += "identifier: "
-        self.output += self.id
+        try:
+            uuid_participant = self.arguments[1]
+        except IndexError:
+            uuid_participant = "no id found"
+        try:
+            uuid_survey = self.arguments[0]
+        except IndexError:
+            uuid_survey = "no id found"
+        try:
+            uuid_redirect = self.arguments[2]
+        except IndexError:
+            uuid_redirect = "redirect"
+        unique = uuid.uuid4()
+        uuid_game = str(unique)
+        self.id_participant = str(uuid_participant)
+        self.id_survey = str(uuid_survey)
+        self.id_game = str(uuid_game)
+        self.redirect = str(uuid_redirect)
+        self.output += f"participant identifier: {self.id_participant}"
         self.output += "\n"
+        self.output += f"survey identifier: {self.id_survey}"
+        self.output += "\n"
+        self.output += f"game identifier: {self.id_game}"
+        self.output += "\n"
+        self.output += f"redirect identifier: {self.redirect}"
+        self.output += "\n"
+        
 
     def post_output(self): #send post request to API with game results
         ct = datetime.datetime.now()
         time_now = str(ct)
         string1 = ""
-        identity = self.id
+        identity = self.id_participant
 
+        self.output += f"timestamp: {time_now}"
+        self.output += "\n"
         self.output += f"game time: {self.time}"
         self.output += "\n"
 
 
         string1 = self.output
 
+        #do not send request if there is an error (404) from the call
+
+        #condition for 500 error
+        #-->fallback retry, redirect if final call is unsuccessful
+
+        #include language condition in parametres
+
         post_dict = {"identity": identity,
-                     "timestamp": time_now,
-                     "data": string1}       
+                     "data": string1}
         output = RequestHandler()
         # Define the URL and data for the POST request
-        url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
+        url = "https://httpbin.org/"
         data = post_dict
         # Send the POST request
         try:
@@ -3889,16 +3921,28 @@ class BudgetGame(): #create class for the game; class includes internal variable
         x2 = 305
         y2 = 100
         rounds = []
-        self.window.fill(self.white)
-        text = self.arial.render("Je hebt het einde van het spel bereikt, bedankt voor het spelen!", True, self.black)
-        self.window.blit(text, (x, y))
-        y += 30
-        text = self.arial.render(f"Je score in het spel was: {self.score_total[0]} uit 100", True, self.black)
-        self.window.blit(text, (x, y))
-        y += 30
-        text = self.arial.render("Klik op een willekeurige plek om de exit-enquête en debriefing te openen!", True, self.black)
-        self.window.blit(text, (x, y))
-        y += 30      
+        if self.redirect == "noredirect":
+            self.window.fill(self.white)
+            text = self.arial.render("Je hebt het einde van het spel bereikt, bedankt voor het spelen!", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
+            text = self.arial.render(f"Je score in het spel was: {self.score_total[0]} uit 100", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
+            text = self.arial.render("U kunt dit browservenster sluiten.", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
+        else:
+            self.window.fill(self.white)
+            text = self.arial.render("Je hebt het einde van het spel bereikt, bedankt voor het spelen!", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
+            text = self.arial.render(f"Je score in het spel was: {self.score_total[0]} uit 100", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
+            text = self.arial.render("Klik op een willekeurige plek om de exit-enquête en debriefing te openen!", True, self.black)
+            self.window.blit(text, (x, y))
+            y += 30
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -4414,7 +4458,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         if condition == "start":
             text1 = self.arial.render("Klik hier om door te gaan naar het spel!", True, self.black)
         if condition == "treatment_start":
-            text1 = self.arial.render("Klik hier om door te gaan naar het prestatierankings!", True, self.black)
+            text1 = self.arial.render(f"Klik hier om door te gaan naar het prestatierankings!", True, self.black)
         if condition == "officer":
             text1 = self.arial.render("Klik hier om door te gaan naar de samenvatting van de ronde", True, self.black)
         rect1 = (x, y, boxwidth, boxheight)

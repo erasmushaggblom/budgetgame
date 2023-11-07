@@ -160,7 +160,6 @@ class RequestHandler:
                 url, data, headers={"Accept": "application/json", "Content-Type": "application/json"}
             ).text
         if self.no_identity == True:
-            print("this")
             game.no_identity = True
         return self.result
 
@@ -621,7 +620,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def finish_game(self): #finish the game and redirect the player to exit survey
         self.add_final_output()
-        self.post_output()
         if self.redirect != "noredirect":
             if self.no_identity == True:
                 url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_6RIIidn8s5BMUu2" + f"?id1={self.id_participant}&id2={self.id_survey}&id3={self.id_game}"
@@ -868,6 +866,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.output = ""
 
     def add_final_output(self): #adds final notes to the output file
+        self.post_output()
         self.output += f"game completed"
         self.output += "\n"
         self.output += f"total number of clicks: {self.click_counter}"
@@ -916,18 +915,13 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
         string1 = self.output
 
-        #do not send request if there is an error (404) from the call
-
-        #condition for 500 error
-        #-->fallback retry, redirect if final call is unsuccessful
-
         #include language condition in parametres
+
+        #move last call earlier in script
 
         post_dict = {"identity": identity,
                      "data": string1}
         output = RequestHandler()
-        if output.no_identity == True:
-            print("now")
         # Define the URL and data for the POST request
         url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
         data = post_dict
@@ -6425,8 +6419,8 @@ game.feedback = game.update_game_feedback()
 async def main(): #main game loop
     while True:
         if game.no_identity == True:
+            game.post_output()
             game.finish_game()
-        print(game.no_identity)
         game.check_caption()
         game.check_score()
         feedback = game.update_game_feedback()

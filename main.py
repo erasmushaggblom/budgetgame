@@ -15,7 +15,6 @@ import datetime
 import uuid
 
 
-
 class RequestHandler:
     """
     WASM compatible request handler
@@ -28,6 +27,7 @@ class RequestHandler:
     _init = False
 
     def __init__(self):
+        self.no_identity = False
         self.is_emscripten = sys.platform == "emscripten"
         if not self._init:
             self.init()
@@ -42,6 +42,7 @@ class RequestHandler:
                 pass
 
     def init(self):
+        self.no_identity = False
         if self.is_emscripten:
             self._js_code = """
     window.Fetch = {}
@@ -133,6 +134,8 @@ class RequestHandler:
             content = await platform.jsiter(platform.window.Fetch.GET(url + "?" + query_string))
             if self.debug:
                 self.print(content)
+                if content == "Unknown identity: no id found":
+                    self.no_identity = True
             self.result = content
         else:
             self.result = self.requests.get(url, params).text
@@ -149,11 +152,16 @@ class RequestHandler:
             content = await platform.jsiter(platform.window.Fetch.POST(url, json.dumps(data)))
             if self.debug:
                 self.print(content)
+                if content == "Unknown identity: no id found":
+                    self.no_identity = True
             self.result = content
         else:
             self.result = self.requests.post(
                 url, data, headers={"Accept": "application/json", "Content-Type": "application/json"}
             ).text
+        if self.no_identity == True:
+            print("this")
+            game.no_identity = True
         return self.result
 
     # def post(self, url, data=None):
@@ -162,6 +170,7 @@ class RequestHandler:
 class BudgetGame(): #create class for the game; class includes internal variables that are tracked throughout the game
     def __init__(self): #inititate the class
         pygame.init()
+        self.no_identity = False
         self.output_tracker = 0
         self.treatment = False #condition to select participants for treatment condition
         self.satisfaction_standard_high = 90 #standard to trigger high satisfaction event
@@ -614,7 +623,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.add_final_output()
         self.post_output()
         if self.redirect != "noredirect":
-            url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_7adyuWjd5qQYEV8" + f"?id1={self.id_participant}&id2={self.id_survey}&id3={self.id_game}"
+            if self.no_identity == True:
+                url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_6RIIidn8s5BMUu2" + f"?id1={self.id_participant}&id2={self.id_survey}&id3={self.id_game}"
+            else:
+                url_open = "https://uantwerpen.eu.qualtrics.com/jfe/form/SV_7adyuWjd5qQYEV8" + f"?id1={self.id_participant}&id2={self.id_survey}&id3={self.id_game}"
         webbrowser.open(url_open)
         raise SystemExit
 
@@ -914,6 +926,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
         post_dict = {"identity": identity,
                      "data": string1}
         output = RequestHandler()
+        if output.no_identity == True:
+            print("now")
         # Define the URL and data for the POST request
         url = "https://europe-west1-budgetgame.cloudfunctions.net/budgetgame_api"
         data = post_dict
@@ -6407,10 +6421,12 @@ game.post_output()
 game.create_historical_rankings()
 game.historical_rankings.append(game.schoolranking)
 game.menu_options = game.create_game_menu() #creates the agency selection menu
-game.check_treatment_condition()
 game.feedback = game.update_game_feedback()
 async def main(): #main game loop
     while True:
+        if game.no_identity == True:
+            game.finish_game()
+        print(game.no_identity)
         game.check_caption()
         game.check_score()
         feedback = game.update_game_feedback()

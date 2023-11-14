@@ -6051,7 +6051,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.window.fill(self.white)
         menu = self.create_main_menu("video")
         self.draw_main_menu(menu)
-        x = 150
+        x = 100
         y = 200
 
         if self.language == "dutch":
@@ -6140,7 +6140,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.budget_buttons = []
         self.budget_menu = self.create_budgeting_menu(self.agency, "video")
         self.draw_budget_options(self.budget_menu)        
-        x = 100
+        x = 25
         y = 200
 
         if self.language == "dutch":
@@ -6199,11 +6199,9 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def intro_5(self):
         self.window.fill(self.white)
         self.agency = "null"
-        self.draw_game_board()
-        self.draw_agency_menu(self.menu_options)
         for i in self.feedback:
             self.draw_feedback(i, ("cornsilk"))
-        x = 150
+        x = 50
         y = 200
 
         if self.language == "dutch":
@@ -6276,7 +6274,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
     def intro_6(self):
         self.window.fill(self.white)
-        x = 50
+        x = 25
         y = 200
 
         if self.language == "dutch":
@@ -7771,7 +7769,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         boxheight1 = 25
         boxheight2 = 25
         boxheight3 = 50
-        boxwidth3 = 400
+        boxwidth3 = 425
         boxwidth = 450
         x = 150
         x1 = x-20

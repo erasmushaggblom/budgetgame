@@ -233,7 +233,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.main_menu_action = False #checks if main menu button has been clicked
         self.scripts = {} #dictionary containing the scripts chosen in a given round
         self.agency_status = {} #dictionary checking for input-based events
-        self.roundstandard = 4 #how many rounds are played
+        self.roundstandard = 3 #how many rounds are played
         self.round_number = 1 #tracks the number of rounds
         self.roundclicked = 2 #tracks the number of times the player has chosen to advance the round
         self.script_events = [0, 0] #list of events that have occurred in the current round
@@ -8890,12 +8890,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
     def update_game_feedback(self): #provides an updating counter which follows the budget available in total and for a given agency
         if self.language == "dutch":    
             feedback_monitors = []
-            x = 160
+            x = 142
             y = 10
             boxheight = 75
-            boxwidth = 290
-            x2 = 455
-            x3 = 750
+            boxwidth = 310
+            x2 = 454.5
+            x3 = 767
             if self.total_budget < 0:
                 colour = self.crimson
             else:
@@ -8908,6 +8908,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
             else:
                 colour = self.crimson
                 feedback_monitors.append(((x3, y, boxwidth, boxheight), (f"Automatische voortgang in {time} seconden"), colour))
+            colour = self.black
+            feedback_monitors.append(((x3, y+25, boxwidth, boxheight-25), (f"Klik op volgende ronde als alles klaar is!"), colour))
 
             colour = self.black
             if self.agency != "null":
@@ -8961,6 +8963,8 @@ class BudgetGame(): #create class for the game; class includes internal variable
             else:
                 colour = self.crimson
                 feedback_monitors.append(((x3, y, boxwidth, boxheight), (f"Auto-progress in {time} seconds"), colour))
+            colour = self.black
+            feedback_monitors.append(((x3, y+25, boxwidth, boxheight-25), (f"Click next round when all schools are done!"), colour))
 
             colour = self.black
             if self.agency != "null":
@@ -10027,6 +10031,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.budgeting_labels2.append((text, x+5, y+205, colour))
                     x += boxwidth + 50
                     count += 1
+                x2 -= 150
+                menu_options.append(((x2, y2, boxwidth, boxheight), (self.tan)))
+                text = "Vooruitgang naar volgende semester"
+                self.budgeting_labels1.append((text, x2+5, y2+5, boxwidth, boxheight))
+                self.budget_buttons.append(((x2, y2, boxwidth, boxheight), "next round", "null"))
+                x2 += 300
                 menu_options.append(((x2, y2, boxwidth, boxheight), (self.tan)))
                 text = "Afsluiten naar hoofdmenu"
                 self.budgeting_labels1.append((text, x2+5, y2+5, boxwidth, boxheight))
@@ -10267,6 +10277,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                         self.budgeting_labels2.append((text, x+5, y+205, colour))
                     x += boxwidth + 50
                     count += 1
+                x2 -= 150
+                menu_options.append(((x2, y2, boxwidth, boxheight), (self.tan)))
+                text = "Advance to the next semester"
+                self.budgeting_labels1.append((text, x2+5, y2+5, boxwidth, boxheight))
+                self.budget_buttons.append(((x2, y2, boxwidth, boxheight), "next round", "null"))
+                x2 += 300
                 menu_options.append(((x2, y2, boxwidth, boxheight), (self.tan)))
                 text = "Exit to main menu"
                 self.budgeting_labels1.append((text, x2+5, y2+5, boxwidth, boxheight))
@@ -10550,6 +10566,22 @@ async def main(): #main game loop
                                     game.show_budget_options = False
                                     game.show_main_menu = True
                                     game.agency = "null"
+
+                                if option == "next round":
+                                    if game.total_budget < 0:
+                                        game.baseconditions()
+                                        game.budget_question = True
+                                        game.add_to_output("menu option 4 clicked")
+                                    else:
+                                        game.baseconditions()
+                                        game.choice = "null"
+                                        game.add_to_output("menu option 4 clicked")
+                                        game.main_menu_action = True
+                                        game.show_agencies = False
+                                        game.show_main_menu = False
+                                        game.show_feedback = False
+                                        game.advance_game_round()
+                                        game.officer_report = True
                                     
                     for i in game.menu_buttons:
                         if game.click_circle(x, y, i[0]) == True and game.show_budget_options != True: #checks if an agency has been clicked

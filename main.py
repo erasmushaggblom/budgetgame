@@ -173,6 +173,16 @@ class RequestHandler:
 class BudgetGame(): #create class for the game; class includes internal variables that are tracked throughout the game
     def __init__(self): #inititate the class
         pygame.init()
+        self.main_menu_time = 0
+        self.report_time = 0
+        self.ranking_time = 0
+        self.historical_ranking_time = 0
+        self.budget_option_time_overall = 0
+        self.budget_option_time_1 = 0
+        self.budget_option_time_2 = 0
+        self.post_round_time = 0
+        self.instruction_time = 0
+        self.other_time = 0
         self.language = "dutch"
         self.default = "english"
         self.no_identity = False
@@ -390,8 +400,6 @@ class BudgetGame(): #create class for the game; class includes internal variable
         return list2
 
     def run_random_scripts(self): #runs chosen random scripts
-        for i in self.agencies:
-            self.reportchoice[i[0]] = []
         list1 = []
         for e in self.agencies:
             agency = e[0]
@@ -410,9 +418,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
         self.output += f"random events: {str(list1)}"
         self.output += "\n"
 
-    def run_input_scripts(self): #runs input scripts based on given conditions
-        for i in self.agencies:
-            self.reportchoice[i[0]] = []        
+    def run_input_scripts(self): #runs input scripts based on given conditions      
         list1 = []
         for e in self.agencies:
             agency = e[0]
@@ -481,8 +487,10 @@ class BudgetGame(): #create class for the game; class includes internal variable
             else:
                 self.adjust_total_budget(self.budget_standard)
             self.reportchoice = {}
-            self.run_random_scripts()
+            for i in self.agencies:
+                self.reportchoice[i[0]] = []  
             self.run_input_scripts()
+            self.run_random_scripts()
             seed1 = None
             seed2 = None
             for i in self.agencies:
@@ -1006,13 +1014,40 @@ class BudgetGame(): #create class for the game; class includes internal variable
         time_now = str(ct)
         string1 = ""
         identity = self.id_participant
-
+        self.main_menu_time = 0
+        self.report_time = 0
+        self.ranking_time = 0
+        self.historical_ranking_time = 0
+        self.budget_option_time_overall = 0
+        self.budget_option_time_1 = 0
+        self.budget_option_time_2 = 0
+        self.post_round_time = 0
+        self.instruction_time = 0
+        self.other_time = 0
+        self.output += f"time in main menu: {self.main_menu_time}"
+        self.output += "\n"
+        self.output += f"time in news reports: {self.report_time}"
+        self.output += "\n"
+        self.output += f"time in ranking: {self.ranking_time}"
+        self.output += "\n"
+        self.output += f"time in historical ranking: {self.historical_ranking_time}"
+        self.output += "\n"
+        self.output += f"time in budget options: { self.budget_option_time_overall}"
+        self.output += "\n"
+        self.output += f"time in budget options (school 1): {self.budget_option_time_1}"
+        self.output += "\n"
+        self.output += f"time in budget options (school 2): {self.budget_option_time_2}"
+        self.output += "\n"
+        self.output += f"time in postround: {self.post_round_time}"
+        self.output += "\n"
+        self.output += f"time in instructions: {self.instruction_time}"
+        self.output += "\n"
+        self.output += f"other time in game: {self.other_time}"
+        self.output += "\n"
         self.output += f"timestamp: {time_now}"
         self.output += "\n"
         self.output += f"game time: {self.time}"
         self.output += "\n"
-
-
         string1 = self.output
 
         #include language condition in parametres
@@ -1205,6 +1240,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
                 y += 40
                 text = self.arial2.render(f"De huidige begrotingsambtenaar werd gekozen na een zeer competitief selectieproces en geniet een lucratief salaris.", True, self.black)
                 lines.append((text, (x, y)))
+                y += 40
                 text = self.arial2.render(f"Het publiek hoopt dat de begrotingsambtenaar de regio de broodnodige financiële stabiliteit zal geven.", True, self.black)
                 lines.append((text, (x, y)))
                 y += 40
@@ -5314,7 +5350,19 @@ class BudgetGame(): #create class for the game; class includes internal variable
             rect1 = self.draw_exit("roundend")
         else:
             rect1 = self.draw_exit("gameend")
-
+        if self.score_last < 50:
+            colour_performance = self.crimson
+        if self.score_last > 49:
+            colour_performance = self.gainsboro
+        if self.score_last > 74:
+            colour_performance = self.forestgreen
+        average_performance = int(sum(self.score_total)/len(self.score_total))
+        if average_performance < 50:
+            colour_average = self.crimson
+        if average_performance > 49:
+            colour_average = self.gainsboro
+        if average_performance > 74:
+            colour_average = self.forestgreen
         texts = []
         x = 150
         x1 = x-20
@@ -5343,7 +5391,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
             text = self.arial.render(f"Je algemene prestatiescore dit semester was: {self.score_last} van de 100", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.dodgerblue, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, colour_performance, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             for i in self.agency_round_results[self.round_number-1]:
@@ -5358,12 +5406,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     highest_school = i[0]
             text = self.arial.render(f"Je laagst presterende school dit semester was {lowest_school} met een prestatiescore van {lowest}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tomato, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.crimson, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"Je hoogst presterende school dit semester was {highest_school} met een prestatiescore van {highest}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.darkolivegreen3, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.forestgreen, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"Je algemene prestatiescore in elk semester tot nu toe is:", True, self.black)
@@ -5373,15 +5421,21 @@ class BudgetGame(): #create class for the game; class includes internal variable
             y1 += 40
             count = 1
             for i in self.score_total:
+                    if i < 50:
+                        colour_round = self.crimson
+                    if i > 49:
+                        colour_round = self.gainsboro
+                    if i > 74:
+                        colour_round = self.forestgreen
                     text = self.arial.render(f"Semester {count}: {i}", True, self.black)
                     texts.append((text, (x+10, y)))
-                    pygame.draw.rect(self.window, self.gold, (x1+10, y1, boxwidth, boxheight3))
+                    pygame.draw.rect(self.window, colour_round, (x1+10, y1, boxwidth, boxheight3))
                     y += 40
                     y1 += 40
                     count += 1
             text = self.arial.render(f"Je gemiddelde prestatiescore in het spel tot nu toe: {int(sum(self.score_total)/len(self.score_total))}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.lightsteelblue, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, colour_average, (x1, y1, boxwidth, boxheight3))
             y += 60
             y1 += 60
 
@@ -5394,12 +5448,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     under_budget += 1
             text = self.arial.render(f"Het aantal semesters dat je tot nu toe aan je budget hebt voldaan: {met_budget}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tan, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.gainsboro, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"Het aantal semesters dat je je budget tot nu toe niet hebt gehaald: {under_budget}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tomato, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.gainsboro, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
 
@@ -5422,7 +5476,7 @@ class BudgetGame(): #create class for the game; class includes internal variable
 
             text = self.arial.render(f"Your overall performance score this semester was: {self.score_last} out of 100", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.dodgerblue, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, colour_performance, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             for i in self.agency_round_results[self.round_number-1]:
@@ -5437,12 +5491,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     highest_school = i[0]
             text = self.arial.render(f"Your lowest performing school this semester was {lowest_school} with a performance score of {lowest}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tomato, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.crimson, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"Your highest performing school this semester was {highest_school} with a performance score of {highest}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.darkolivegreen3, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.forestgreen, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"Your overall performance score in each semester so far has been:", True, self.black)
@@ -5452,15 +5506,21 @@ class BudgetGame(): #create class for the game; class includes internal variable
             y1 += 40
             count = 1
             for i in self.score_total:
+                    if i < 50:
+                        colour_round = self.crimson
+                    if i > 49:
+                        colour_round = self.gainsboro
+                    if i > 74:
+                        colour_round = self.forestgreen
                     text = self.arial.render(f"Semester {count}: {i}", True, self.black)
                     texts.append((text, (x+10, y)))
-                    pygame.draw.rect(self.window, self.gold, (x1+10, y1, boxwidth, boxheight3))
+                    pygame.draw.rect(self.window, colour_round, (x1+10, y1, boxwidth, boxheight3))
                     y += 40
                     y1 += 40
                     count += 1
             text = self.arial.render(f"Your average performance score in the game so far: {int(sum(self.score_total)/len(self.score_total))}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.lightsteelblue, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, colour_average, (x1, y1, boxwidth, boxheight3))
             y += 60
             y1 += 60
 
@@ -5473,12 +5533,12 @@ class BudgetGame(): #create class for the game; class includes internal variable
                     under_budget += 1
             text = self.arial.render(f"The number of semesters you have met your budget so far: {met_budget}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tan, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.gainsboro, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
             text = self.arial.render(f"The number of semesters you have been under your budget so far: {under_budget}", True, self.black)
             texts.append((text, (x, y)))
-            pygame.draw.rect(self.window, self.tomato, (x1, y1, boxwidth, boxheight3))
+            pygame.draw.rect(self.window, self.gainsboro, (x1, y1, boxwidth, boxheight3))
             y += 40
             y1 += 40
 
@@ -7049,6 +7109,28 @@ async def main(): #main game loop
         except KeyError:
             pass
         game.clock.tick(60)
+        if game.show_main_menu == True:
+            game.main_menu_time += 1/60
+        elif game.news_information == True or game.officer_report == True:
+            game.report_time += 1/60
+        elif game.show_rankings == True:
+            game.ranking_time += 1/60
+        elif game.history_information == True:
+            game.historical_ranking_time += 1/60
+        elif game.show_budget_options == True:
+            game.budget_option_time_overall += 1/60
+            if game.agency == game.agencies[0][0]:
+                game.budget_option_time_1 += 1/60
+            if game.agency == game.agencies[1][0]:
+                game.budget_option_time_2 += 1/60
+        elif game.roundover == True:
+            game.post_round_time += 1/60
+        elif game.start == True:
+            game.instruction_time += 1/60
+        elif game.show_effects == True:
+            game.instruction_time += 1/60
+        else:
+            game.other_time += 1/60
         game.time += 1/60
         pygame.display.update()
         await asyncio.sleep(0)
